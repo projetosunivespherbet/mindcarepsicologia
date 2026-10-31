@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/AppShell";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Agenda from "./pages/Agenda";
+import ClinicPage from "./pages/Clinic";
 import DocumentEditor from "./pages/DocumentEditor";
 import { DocumentList, DocumentNew } from "./pages/Documents";
 import Invite from "./pages/Invite";
@@ -69,6 +70,7 @@ function AppRoutes() {
         <Route path="/financeiro" element={<Finance />} />
         <Route path="/nota-fiscal" element={<Guard allow={canDocs}><Fiscal /></Guard>} />
         <Route path="/papel-timbrado" element={<Guard allow={isAdmin}><Letterheads /></Guard>} />
+        <Route path="/clinica" element={<Guard allow={isAdmin}><ClinicPage /></Guard>} />
         <Route path="/usuarios" element={<Guard allow={isAdmin}><Users /></Guard>} />
       </Route>
       <Route path="*" element={<NotFound />} />

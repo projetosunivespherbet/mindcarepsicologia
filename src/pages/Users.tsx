@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, KeyRound, Plus, UserCheck, UserX } from "lucide-react";
+import { Copy, KeyRound, Pencil, Plus, UserCheck, UserX } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -88,6 +88,37 @@ export default function Users() {
     onError: (e) => toast.error(errMsg(e)),
   });
 
+  const [editing, setEditing] = useState<AppUser | null>(null);
+  const [eform, setEform] = useState({ nome: "", role: "psicologo" as Role, crp: "", atende: false, telefone: "" });
+  const openEdit = (u: AppUser) => {
+    setEform({ nome: u.nome, role: u.role, crp: u.crp ?? "", atende: u.atende, telefone: u.telefone ?? "" });
+    setEditing(u);
+  };
+  const eAtende = eform.role === "admin" ? eform.atende : eform.role === "psicologo";
+  const edit = useMutation({
+    mutationFn: () =>
+      api(`/users/${editing?.id}`, {
+        method: "PATCH",
+        body: {
+          nome: eform.nome.trim(),
+          role: eform.role,
+          crp: eform.crp.trim() || null,
+          atende: eAtende,
+          telefone: eform.telefone.trim() || null,
+        },
+      }),
+    onSuccess: () => {
+      setEditing(null);
+      toast.success("Usuário atualizado");
+      void qc.invalidateQueries({ queryKey: ["users"] });
+    },
+    onError: (e) => toast.error(errMsg(e)),
+  });
+  const submitEdit = (e: FormEvent) => {
+    e.preventDefault();
+    edit.mutate();
+  };
+
   const needsCrp = form.role === "psicologo" || (form.role === "admin" && form.atende);
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -133,6 +164,9 @@ export default function Users() {
                   <Badge variant={u.status === "ativo" ? "default" : "secondary"}>{STATUS_LABEL[u.status]}</Badge>
                 </TableCell>
                 <TableCell className="text-right space-x-1 whitespace-nowrap">
+                  <Button size="sm" variant="outline" onClick={() => openEdit(u)}>
+                    <Pencil className="w-3.5 h-3.5 mr-1" /> Editar
+                  </Button>
                   {u.status !== "inativo" && (
                     <Button size="sm" variant="outline" onClick={() => newLink.mutate(u)} disabled={newLink.isPending}>
                       <KeyRound className="w-3.5 h-3.5 mr-1" /> {u.status === "convidado" ? "Novo convite" : "Redefinir senha"}
@@ -216,6 +250,61 @@ export default function Users() {
               </Button>
               <Button type="submit" disabled={create.isPending}>
                 {create.isPending ? "Criando..." : "Criar e gerar link"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar usuário</DialogTitle>
+            <DialogDescription>{editing?.email ?? "O e-mail será informado pela pessoa ao aceitar o convite."}</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={submitEdit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="e-nome">Nome completo</Label>
+              <Input id="e-nome" required minLength={2} value={eform.nome} onChange={(e) => setEform({ ...eform, nome: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Papel</Label>
+              <Select value={eform.role} onValueChange={(v) => setEform({ ...eform, role: v as Role })}>
+                <SelectTrigger aria-label="Papel">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="psicologo">Psicólogo(a)</SelectItem>
+                  <SelectItem value="recepcao">Recepção</SelectItem>
+                  <SelectItem value="admin">Administração</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {eform.role === "admin" && (
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <Label htmlFor="e-atende">Também atende pacientes</Label>
+                  <p className="text-xs text-muted-foreground">Exige CRP e libera prontuário e documentos.</p>
+                </div>
+                <Switch id="e-atende" checked={eform.atende} onCheckedChange={(v) => setEform({ ...eform, atende: v })} />
+              </div>
+            )}
+            {eAtende && (
+              <div className="space-y-2">
+                <Label htmlFor="e-crp">CRP</Label>
+                <Input id="e-crp" required placeholder="06/123456" value={eform.crp} onChange={(e) => setEform({ ...eform, crp: e.target.value })} />
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="e-tel">Telefone (opcional)</Label>
+              <Input id="e-tel" value={eform.telefone} onChange={(e) => setEform({ ...eform, telefone: e.target.value })} />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditing(null)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={edit.isPending}>
+                {edit.isPending ? "Salvando..." : "Salvar"}
               </Button>
             </DialogFooter>
           </form>

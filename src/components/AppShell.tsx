@@ -1,5 +1,5 @@
 import { Outlet, useNavigate } from "react-router-dom";
-import { Brain, CalendarDays, FileText, Wallet, LogOut, Palette, Receipt, UserCog, Users } from "lucide-react";
+import { Brain, Building2, CalendarDays, FileText, Wallet, LogOut, Palette, Receipt, UserCog, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { NavLink } from "@/components/NavLink";
@@ -18,6 +18,7 @@ export function AppShell() {
     { to: "/documentos", label: "Documentos", icon: FileText, show: canProduceDocuments },
     { to: "/nota-fiscal", label: "Nota fiscal", icon: Receipt, show: canProduceDocuments },
     { to: "/papel-timbrado", label: "Papel timbrado", icon: Palette, show: user.role === "admin" },
+    { to: "/clinica", label: "Clínica", icon: Building2, show: user.role === "admin" },
     { to: "/usuarios", label: "Usuários", icon: UserCog, show: user.role === "admin" },
   ].filter((i) => i.show);
 

@@ -11,6 +11,8 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>;
   acceptInvite: (token: string, password: string, email?: string) => Promise<void>;
   logout: () => void;
+  /** recarrega o perfil (por exemplo, depois de renomear a clínica) */
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -73,8 +75,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       acceptInvite,
       logout,
+      refresh: loadMe,
     }),
-    [user, loading, login, acceptInvite, logout],
+    [user, loading, login, acceptInvite, logout, loadMe],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -20,6 +20,19 @@ export interface Me {
   timezone: string;
 }
 
+export interface Clinic {
+  id: string;
+  nome: string;
+  timezone: string;
+  documento_tipo: "cpf" | "cnpj" | null;
+  documento: string | null;
+  razao_social: string | null;
+  telefone: string | null;
+  email: string | null;
+  endereco: string | null;
+  updated_at: string;
+}
+
 export interface AppUser {
   id: string;
   nome: string;

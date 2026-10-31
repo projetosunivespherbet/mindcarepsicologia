@@ -8,6 +8,7 @@ import { access } from "./routes/access";
 import { appointments, blocks } from "./routes/appointments";
 import { documents, letterheads, publicDocuments } from "./routes/documents";
 import { changes } from "./routes/audit";
+import { clinic } from "./routes/clinic";
 import { fiscal, nfse } from "./routes/fiscal";
 import { charges, finance, payers, payments, services } from "./routes/finance";
 import { patients } from "./routes/patients";
@@ -84,6 +85,7 @@ export function createApp(deps: Deps) {
     }
   });
   app.route("/", access);
+  app.route("/clinic", clinic);
   app.route("/users", users);
   app.route("/professionals", professionals);
   app.route("/patients", patients);
