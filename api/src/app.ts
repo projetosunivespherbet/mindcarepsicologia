@@ -66,6 +66,20 @@ export function createApp(deps: Deps) {
       return c.json({ ok: true, db: true });
     } catch (err) {
       console.error("health/db:", err);
+      // Diagnóstico sem segredos: ajuda a achar erro de formato em DATABASE_URL (sem senha, só forma).
+      const u = String(c.env.DATABASE_URL ?? "");
+      console.error(
+        "health/db diag:",
+        err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+        JSON.stringify({
+          tamanho: u.length,
+          inicio: u.slice(0, 13),
+          espacos: /\s/.test(u),
+          aspas: /["'`]/.test(u),
+          arrobas: (u.match(/@/g) ?? []).length,
+          host: (u.split("@").pop() ?? "").split("/")[0],
+        }),
+      );
       return c.json({ ok: false, db: false }, 503);
     }
   });
