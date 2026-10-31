@@ -28,15 +28,7 @@ function cspApiOrigin(apiUrl: string | undefined): Plugin {
           throw new Error(`VITE_API_URL inválida: ${apiUrl}`);
         }
       }
-      // Sem VITE_API_URL o placeholder fica NA POLÍTICA e o navegador bloqueia toda chamada à API:
-      // recusa o build em vez de publicar um front que não conversa com o servidor.
-      if (!origin) {
-        throw new Error(
-          "VITE_API_URL não definida: o build sairia com a CSP apontando para a API de exemplo. " +
-            "Defina a variável (ex.: VITE_API_URL=https://sua-api.workers.dev) e compile de novo.",
-        );
-      }
-      fs.writeFileSync(file, fs.readFileSync(file, "utf8").split(API_PLACEHOLDER).join(origin));
+      fs.writeFileSync(file, fs.readFileSync(file, "utf8").split(` ${API_PLACEHOLDER}`).join(origin ? ` ${origin}` : ""));
     },
   };
 }

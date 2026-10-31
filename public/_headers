@@ -1,0 +1,11 @@
+# Cabeçalhos do Cloudflare Pages.
+# A origem da API (VITE_API_URL) é colocada em connect-src automaticamente durante o build (vite.config.ts).
+# A política foi testada em Chrome com todas as telas, o envio de imagens e o PDF, sem nenhum bloqueio.
+# Se algum dia algo legítimo for bloqueado, o console do navegador (F12) mostra a diretiva; para investigar sem
+# bloquear, renomeie temporariamente Content-Security-Policy para Content-Security-Policy-Report-Only.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://SEU-WORKER.SEU-SUBDOMINIO.workers.dev; object-src 'self' blob:; frame-src 'self' blob:; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()

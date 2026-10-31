@@ -1,0 +1,13 @@
+{
+  "name": "mindcare-e2e-browser",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node run.mjs",
+    "test:report": "node run.mjs report"
+  },
+  "dependencies": {
+    "@sparticuz/chromium": "^153.0.0",
+    "puppeteer-core": "^25.16.0"
+  }
+}

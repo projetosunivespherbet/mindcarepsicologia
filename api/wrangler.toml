@@ -1,0 +1,11 @@
+name = "mindcare-api"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+APP_URL = "https://SEU-APP.pages.dev"
+ALLOWED_ORIGIN = "https://SEU-APP.pages.dev"
+
+# Segredos (wrangler secret put ...): DATABASE_URL, JWT_SECRET, SETUP_TOKEN, TURNSTILE_SECRET (opcional)
+# Passo a passo completo: DEPLOY.md na raiz do repositório.

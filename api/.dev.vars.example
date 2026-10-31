@@ -1,0 +1,6 @@
+DATABASE_URL="postgres://app_user:SENHA@HOST/neondb?sslmode=require"
+JWT_SECRET="gere-com-openssl-rand-base64-48"
+SETUP_TOKEN="gere-com-openssl-rand-base64-32"
+# Desenvolvimento local: o front roda em http://localhost:8080
+APP_URL="http://localhost:8080"
+ALLOWED_ORIGIN="http://localhost:8080"

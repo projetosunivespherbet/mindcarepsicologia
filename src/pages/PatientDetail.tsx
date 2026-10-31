@@ -1,0 +1,244 @@
+import { useState, type FormEvent } from "react";
+import { Link, useParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, FilePlus2 } from "lucide-react";
+import { toast } from "sonner";
+import { DocStatusBadge } from "@/components/DocStatusBadge";
+import { PatientCharges } from "@/components/PatientCharges";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/contexts/AuthContext";
+import { api, errMsg } from "@/lib/api";
+import type { Anamnesis, DocListItem, PatientDetail as PatientDetailType } from "@/lib/types";
+import { DOCUMENT_TYPES } from "@shared/documents";
+import { ProfessionalSelect } from "./Patients";
+
+const ANAMNESIS_FIELDS: { key: keyof Anamnesis; label: string }[] = [
+  { key: "queixa_principal", label: "Queixa principal" },
+  { key: "historico_familiar", label: "Histórico familiar" },
+  { key: "medicamentos", label: "Medicamentos em uso" },
+  { key: "tratamentos_anteriores", label: "Tratamentos anteriores" },
+  { key: "expectativas", label: "Expectativas" },
+];
+
+function DataForm({ patient }: { patient: PatientDetailType }) {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const [f, setF] = useState({
+    nome: patient.nome,
+    cpf: patient.cpf ?? "",
+    data_nascimento: patient.data_nascimento ?? "",
+    telefone: patient.telefone ?? "",
+    email: patient.email ?? "",
+    genero: patient.genero ?? "",
+    estado_civil: patient.estado_civil ?? "",
+    profissao: patient.profissao ?? "",
+    professional_id: patient.professional_id ?? "",
+    ativo: patient.ativo,
+  });
+  const save = useMutation({
+    mutationFn: () =>
+      api(`/patients/${patient.id}`, {
+        method: "PATCH",
+        body: {
+          nome: f.nome,
+          cpf: f.cpf.trim() || null,
+          data_nascimento: f.data_nascimento || null,
+          telefone: f.telefone || null,
+          email: f.email || null,
+          genero: f.genero || null,
+          estado_civil: f.estado_civil || null,
+          profissao: f.profissao || null,
+          ativo: f.ativo,
+          ...(user?.role === "psicologo" ? {} : { professional_id: f.professional_id || null }),
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Dados salvos");
+      void qc.invalidateQueries({ queryKey: ["patient", patient.id] });
+      void qc.invalidateQueries({ queryKey: ["patients"] });
+    },
+    onError: (e) => toast.error(errMsg(e)),
+  });
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    save.mutate();
+  };
+  return (
+    <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
+      <div className="space-y-2 sm:col-span-2">
+        <Label htmlFor="d-nome">Nome completo</Label>
+        <Input id="d-nome" required value={f.nome} onChange={set("nome")} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="d-cpf">CPF</Label>
+        <Input id="d-cpf" inputMode="numeric" placeholder="000.000.000-00" value={f.cpf} onChange={set("cpf")} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="d-nasc">Nascimento</Label>
+        <Input id="d-nasc" type="date" value={f.data_nascimento} onChange={set("data_nascimento")} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="d-tel">Telefone</Label>
+        <Input id="d-tel" value={f.telefone} onChange={set("telefone")} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="d-email">E-mail</Label>
+        <Input id="d-email" type="email" value={f.email} onChange={set("email")} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="d-gen">Gênero</Label>
+        <Input id="d-gen" value={f.genero} onChange={set("genero")} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="d-civil">Estado civil</Label>
+        <Input id="d-civil" value={f.estado_civil} onChange={set("estado_civil")} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="d-prof">Profissão</Label>
+        <Input id="d-prof" value={f.profissao} onChange={set("profissao")} />
+      </div>
+      {user?.role !== "psicologo" && (
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="d-resp">Psicólogo responsável</Label>
+          <ProfessionalSelect id="d-resp" value={f.professional_id} onChange={(v) => setF({ ...f, professional_id: v })} />
+        </div>
+      )}
+      <div className="flex items-center gap-3 sm:col-span-2">
+        <Switch id="d-ativo" checked={f.ativo} onCheckedChange={(v) => setF({ ...f, ativo: v })} />
+        <Label htmlFor="d-ativo">Paciente ativo</Label>
+      </div>
+      <div className="sm:col-span-2">
+        <Button type="submit" disabled={save.isPending}>
+          {save.isPending ? "Salvando..." : "Salvar dados"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function AnamnesisForm({ patient }: { patient: PatientDetailType }) {
+  const qc = useQueryClient();
+  const [f, setF] = useState<Record<string, string>>(
+    Object.fromEntries(ANAMNESIS_FIELDS.map(({ key }) => [key, patient.anamnesis?.[key] ?? ""])),
+  );
+  const save = useMutation({
+    mutationFn: () => api(`/patients/${patient.id}/anamnesis`, { method: "PUT", body: f }),
+    onSuccess: () => {
+      toast.success("Anamnese salva");
+      void qc.invalidateQueries({ queryKey: ["patient", patient.id] });
+    },
+    onError: (e) => toast.error(errMsg(e)),
+  });
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        save.mutate();
+      }}
+      className="space-y-4"
+    >
+      {ANAMNESIS_FIELDS.map(({ key, label }) => (
+        <div key={key} className="space-y-2">
+          <Label htmlFor={`a-${key}`}>{label}</Label>
+          <Textarea id={`a-${key}`} rows={3} value={f[key]} onChange={(e) => setF({ ...f, [key]: e.target.value })} />
+        </div>
+      ))}
+      <Button type="submit" disabled={save.isPending}>
+        {save.isPending ? "Salvando..." : "Salvar anamnese"}
+      </Button>
+    </form>
+  );
+}
+
+function PatientDocuments({ patientId }: { patientId: string }) {
+  const docs = useQuery({ queryKey: ["documents", { patientId }], queryFn: () => api<DocListItem[]>(`/documents?patient_id=${patientId}`) });
+  return (
+    <div className="space-y-3">
+      <Button asChild>
+        <Link to={`/documentos/novo?paciente=${patientId}`}>
+          <FilePlus2 className="w-4 h-4 mr-2" /> Novo documento
+        </Link>
+      </Button>
+      <ul className="divide-y rounded-xl border bg-card">
+        {docs.data?.map((d) => (
+          <li key={d.id} className="flex items-center justify-between gap-3 p-3">
+            <Link to={`/documentos/${d.id}`} className="min-w-0">
+              <p className="font-medium text-primary hover:underline truncate">{d.titulo}</p>
+              <p className="text-xs text-muted-foreground">
+                {DOCUMENT_TYPES[d.tipo]?.label} · {d.numero ?? "sem número"} · {d.data_documento.split("-").reverse().join("/")}
+              </p>
+            </Link>
+            <DocStatusBadge status={d.status} />
+          </li>
+        ))}
+        {docs.data?.length === 0 && <li className="p-6 text-center text-sm text-muted-foreground">Nenhum documento para este paciente.</li>}
+      </ul>
+    </div>
+  );
+}
+
+export default function PatientDetail() {
+  const { id = "" } = useParams();
+  const { user, canProduceDocuments } = useAuth();
+  const q = useQuery({ queryKey: ["patient", id], queryFn: () => api<PatientDetailType>(`/patients/${id}`), retry: false });
+  const p = q.data;
+
+  const canClinical = !!user && !!p && ((user.role === "psicologo" && p.professional_id === user.id) || (user.role === "admin" && user.atende));
+
+  return (
+    <div className="space-y-4">
+      <Button asChild variant="ghost" size="sm">
+        <Link to="/pacientes">
+          <ArrowLeft className="w-4 h-4 mr-1" /> Pacientes
+        </Link>
+      </Button>
+      {q.isLoading && <p className="text-muted-foreground">Carregando...</p>}
+      {q.isError && <p className="text-destructive">Paciente não encontrado ou sem permissão de acesso.</p>}
+      {p && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{p.nome}</CardTitle>
+            <CardDescription>{p.ativo ? "Paciente ativo" : "Paciente inativo"}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="dados">
+              <TabsList>
+                <TabsTrigger value="dados">Dados</TabsTrigger>
+                <TabsTrigger value="anamnese">Anamnese</TabsTrigger>
+                {canProduceDocuments && <TabsTrigger value="documentos">Documentos</TabsTrigger>}
+                <TabsTrigger value="cobrancas">Cobranças</TabsTrigger>
+              </TabsList>
+              <TabsContent value="dados" className="pt-4">
+                <DataForm key={`${p.id}-${p.nome}`} patient={p} />
+              </TabsContent>
+              <TabsContent value="anamnese" className="pt-4">
+                {canClinical ? (
+                  <AnamnesisForm key={p.id} patient={p} />
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Os dados clínicos ficam restritos ao psicólogo responsável pelo paciente.
+                  </p>
+                )}
+              </TabsContent>
+              <TabsContent value="cobrancas" className="pt-4">
+                <PatientCharges patient={p} />
+              </TabsContent>
+              {canProduceDocuments && (
+                <TabsContent value="documentos" className="pt-4">
+                  <PatientDocuments patientId={p.id} />
+                </TabsContent>
+              )}
+            </Tabs>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
