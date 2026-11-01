@@ -16,8 +16,8 @@ describe("Pix copia e cola", () => {
 
   it("omite o valor quando é zero e limita nome a 25 e cidade a 15 caracteres", () => {
     const code = pixCopiaECola({ chave: "a@b.com", nome: "Nome Muito Comprido Para O Campo Do Pix", cidade: "Cidade De Nome Muito Longo" });
-    expect(code).not.toContain("54");
-    expect(code).toContain("5925NOME MUITO COMPRIDO PARA");
-    expect(code).toMatch(/6015CIDADE DE NOME M/);
+    expect(code).not.toContain("5303986540"); // sem o campo 54 (valor) depois da moeda
+    expect(code).toContain("5924NOME MUITO COMPRIDO PARA"); // 25 caracteres cortados e sem o espaço final
+    expect(code).toContain("6014CIDADE DE NOME");
   });
 });

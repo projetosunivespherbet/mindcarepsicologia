@@ -311,7 +311,8 @@ describe.skipIf(!process.env.E2E_PG)("fluxo completo: telas + API + Postgres", (
     // segunda sessão do dia, marcada como falta (não gera cobrança)
     const hoje = new Date();
     const at16 = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 2, 0);
-    await call("POST", "/appointments", { token: seed.anaToken, body: { patient_id: seed.patient.id, starts_at: at16.toISOString(), ends_at: new Date(at16.getTime() + 50 * 60_000).toISOString(), valor: 180 } });
+    const segunda = await call("POST", "/appointments", { token: seed.anaToken, body: { patient_id: seed.patient.id, starts_at: at16.toISOString(), ends_at: new Date(at16.getTime() + 50 * 60_000).toISOString(), valor: 180 } });
+    expect(segunda.status, JSON.stringify(segunda.json)).toBe(201);
     await openApp("/agenda", seed.anaToken);
     await user.click(await screen.findByRole("button", { name: "Faltou" }));
     expect(await screen.findByText("Faltou", { selector: "span, div" })).toBeInTheDocument();
@@ -358,7 +359,7 @@ describe.skipIf(!process.env.E2E_PG)("fluxo completo: telas + API + Postgres", (
   it("administração vê o resumo por profissional no Financeiro", async () => {
     await openApp("/financeiro", seed.adminToken);
     expect(await screen.findByText("Por profissional", undefined, { timeout: 5000 })).toBeInTheDocument();
-    expect(await screen.findByText("Dra. Ana Lima")).toBeInTheDocument();
+    expect(await screen.findByText("Dra. Ana Lima", { selector: "span" })).toBeInTheDocument(); // o nome também aparece no seletor do Receita Saúde
   });
 
   it("sessão pro bono: sem valor, realizada sem gerar cobrança", async () => {
