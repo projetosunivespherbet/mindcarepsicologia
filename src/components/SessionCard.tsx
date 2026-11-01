@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { DetailDialog } from "@/components/PatientCharges";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, errMsg } from "@/lib/api";
@@ -76,7 +77,20 @@ export function SessionCard({
   const qc = useQueryClient();
   const [perguntaFalta, setPerguntaFalta] = useState(false);
   const [verCobranca, setVerCobranca] = useState<string | null>(null);
-  useEffect(() => setPerguntaFalta(false), [a?.id]);
+  const [obs, setObs] = useState<string | null>(null); // null = só leitura
+  useEffect(() => {
+    setPerguntaFalta(false);
+    setObs(null);
+  }, [a?.id]);
+  const salvarObs = useMutation({
+    mutationFn: () => api(`/appointments/${a!.id}`, { method: "PATCH", body: { observacao: obs?.trim() || null } }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["appointments"] });
+      toast.success("Observação salva");
+      setObs(null);
+    },
+    onError: (e) => toast.error(errMsg(e)),
+  });
   const pacotes = useQuery({
     queryKey: ["packages", a?.patient_id],
     enabled: !!a && open,
@@ -155,6 +169,32 @@ export function SessionCard({
                 {a.agendado_por ? ` por ${a.agendado_por}` : ""}
               </p>
               {proName && <p>Psicólogo: {proName}</p>}
+            </section>
+
+            <section aria-label="Observação do agendamento" className="text-sm">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Observação</h3>
+                {obs === null && a.status !== "cancelado" && (
+                  <Button size="sm" variant="ghost" className="h-7" onClick={() => setObs(a.observacao ?? "")}>
+                    {a.observacao ? "Editar" : "Adicionar"}
+                  </Button>
+                )}
+              </div>
+              {obs === null ? (
+                <p className={a.observacao ? "whitespace-pre-wrap" : "text-muted-foreground"}>{a.observacao || "Nenhuma observação."}</p>
+              ) : (
+                <div className="space-y-2">
+                  <Textarea aria-label="Observação do agendamento" rows={3} maxLength={500} value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Recado para a equipe. Conteúdo clínico vai no prontuário." />
+                  <div className="flex gap-2">
+                    <Button size="sm" disabled={salvarObs.isPending} onClick={() => salvarObs.mutate()}>
+                      Salvar observação
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setObs(null)}>
+                      Voltar
+                    </Button>
+                  </div>
+                </div>
+              )}
             </section>
 
             <div className="flex flex-wrap gap-2 border-t pt-3">

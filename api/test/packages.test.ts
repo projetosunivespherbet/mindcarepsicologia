@@ -83,4 +83,13 @@ describe("pacote de sessões", () => {
     const item = (await call("GET", `/appointments?from=${encodeURIComponent(at(0, "00:00"))}&to=${encodeURIComponent(at(7, "00:00"))}`, { token: s.psiA.token })).json.find((a: { id: string }) => a.id === a1);
     expect(item).toMatchObject({ charge_id: ch.id, package_id: null });
   });
+
+  it("observação do agendamento: grava ao criar, edita e limpa", async () => {
+    const s = await cenario();
+    const ap = (await call("POST", "/appointments", { token: s.rec.token, body: { patient_id: s.pac.id, professional_id: s.psiA.id, starts_at: at(3, "09:00"), ends_at: at(3, "10:00"), observacao: "  Trazer encaminhamento  " } })).json;
+    expect(ap.observacao).toBe("Trazer encaminhamento");
+    expect((await call("PATCH", `/appointments/${ap.id}`, { token: s.psiA.token, body: { observacao: "Chegar 10 min antes" } })).json.observacao).toBe("Chegar 10 min antes");
+    expect((await call("PATCH", `/appointments/${ap.id}`, { token: s.rec.token, body: { observacao: null } })).json.observacao).toBeNull();
+    expect((await call("PATCH", `/appointments/${ap.id}`, { token: s.rec.token, body: { observacao: "x".repeat(501) } })).status).toBe(400);
+  });
 });

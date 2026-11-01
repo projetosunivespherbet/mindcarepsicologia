@@ -256,6 +256,8 @@ export interface Appointment {
   charge_id: string | null;
   /** Pacote do qual a sessão foi descontada. */
   package_id: string | null;
+  /** Recado administrativo do agendamento (não clínico). */
+  observacao: string | null;
   created_at: string;
   imposto: boolean;
   series_id: string | null;

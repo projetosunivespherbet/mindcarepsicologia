@@ -8,7 +8,7 @@ import type { AppEnv } from "../types";
 import { isoDateTime, optText, readBody, readQuery } from "../validation";
 
 const COLS = `id, patient_id, professional_id, starts_at, ends_at, tipo, status, valor::float8 AS valor,
-              payment_status, convenio, atendimento, imposto, series_id, package_id, created_at, updated_at`;
+              payment_status, convenio, atendimento, imposto, series_id, package_id, observacao, created_at, updated_at`;
 // situação da nota da sessão (a cobrança ativa e a nota ativa dela): nulo = ainda sem nota
 const NOTA_STATUS = `(SELECT d.status FROM charges ch JOIN fiscal_document_charges l ON l.charge_id = ch.id AND l.ativo
                       JOIN fiscal_documents d ON d.id = l.document_id
@@ -38,6 +38,7 @@ const appointmentFields = {
   convenio: z.boolean(),
   atendimento: z.enum(ATENDIMENTOS),
   imposto: z.boolean(),
+  observacao: optText(500),
 };
 
 // Prontuário da sessão: true/false só para o profissional da sessão; nulo para os demais (não enxergam o prontuário).
@@ -149,6 +150,7 @@ appointments.post("/", async (c) => {
       convenio: z.boolean().optional(),
       atendimento: appointmentFields.atendimento.optional(),
       imposto: z.boolean().default(false),
+      observacao: optText(500),
       recorrencia: z.object({ frequencia: z.literal("semanal"), ocorrencias: z.number().int().min(2).max(52) }).optional(),
     }),
   );
@@ -165,16 +167,16 @@ appointments.post("/", async (c) => {
     if (!patient) throw new HTTPException(404, { message: "Paciente não encontrado" });
 
     const r = await db.query(
-      `INSERT INTO appointments (clinic_id, patient_id, professional_id, starts_at, ends_at, tipo, valor, convenio, imposto, series_id, created_by, atendimento)
+      `INSERT INTO appointments (clinic_id, patient_id, professional_id, starts_at, ends_at, tipo, valor, convenio, imposto, series_id, created_by, atendimento, observacao)
        SELECT app_clinic(), $1, $2,
               (($3::timestamptz AT TIME ZONE c.timezone) + g.n * interval '7 days') AT TIME ZONE c.timezone,
               (($4::timestamptz AT TIME ZONE c.timezone) + g.n * interval '7 days') AT TIME ZONE c.timezone,
-              $5, $6, $7, $8, $10::uuid, app_user(), $11
+              $5, $6, $7, $8, $10::uuid, app_user(), $11, $12
        FROM clinics c, generate_series(0, $9::int - 1) AS g(n)
        WHERE c.id = app_clinic()
        RETURNING ${COLS}`,
       [body.patient_id, professionalId, body.starts_at, body.ends_at, body.tipo, body.valor ?? null, atendimento === "convenio", body.imposto, n,
-       n > 1 ? crypto.randomUUID() : null, atendimento],
+       n > 1 ? crypto.randomUUID() : null, atendimento, body.observacao || null],
     );
     await audit(db, s, "appointment.create", "appointment", r.rows[0].id);
     return r.rows.sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
