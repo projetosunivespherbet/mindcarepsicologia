@@ -261,17 +261,27 @@ export interface TemplateContext {
   cns?: string | null;
   /** Endereço: só entra quando o profissional escolhe incluir. */
   endereco?: string | null;
+  /** Responsável legal: entra quando o profissional escolhe (padrão para quem tem responsável cadastrado). */
+  responsavel?: { nome: string; cpf?: string | null; vinculo?: string | null } | null;
   /** Sessão a que o documento se refere (ISO). Sem ela, o texto pede para preencher data e horário. */
   inicio?: string | null;
   fim?: string | null;
 }
 
 /** ", portador do CPF X e do CNS Y, residente em Z," — só com o que está cadastrado; vazio se nada. */
-export function identificacaoPaciente(cpf?: string | null, cns?: string | null, endereco?: string | null): string {
+export function identificacaoPaciente(
+  cpf?: string | null,
+  cns?: string | null,
+  endereco?: string | null,
+  responsavel?: { nome: string; cpf?: string | null; vinculo?: string | null } | null,
+): string {
   const partes = [cpf ? `do CPF ${formatCpf(cpf)}` : "", cns ? `do CNS ${formatCns(cns)}` : ""].filter(Boolean);
   const doc = partes.length ? `, portador ${partes.join(" e ")}` : "";
   const end = endereco?.trim() ? `, residente em ${endereco.trim()}` : "";
-  return doc || end ? `${doc}${end},` : "";
+  const resp = responsavel?.nome?.trim()
+    ? `, representado(a) por ${responsavel.nome.trim()}${responsavel.vinculo ? ` (${responsavel.vinculo})` : ""}, responsável legal${responsavel.cpf ? `, CPF ${formatCpf(responsavel.cpf)}` : ""}`
+    : "";
+  return doc || end || resp ? `${doc}${end}${resp},` : "";
 }
 
 function quando(inicio?: string | null, fim?: string | null): string {
@@ -284,7 +294,7 @@ function quando(inicio?: string | null, fim?: string | null): string {
 export function fillTemplate(text: string, ctx: TemplateContext) {
   return text
     .split("{{paciente}}").join(ctx.paciente)
-    .split("{{identificacao}}").join(identificacaoPaciente(ctx.cpf, ctx.cns, ctx.endereco))
+    .split("{{identificacao}}").join(identificacaoPaciente(ctx.cpf, ctx.cns, ctx.endereco, ctx.responsavel))
     .split("{{cpf}}").join(ctx.cpf ? formatCpf(ctx.cpf) : "[CPF]")
     .split("{{cns}}").join(ctx.cns ? formatCns(ctx.cns) : "[CNS]")
     .split("{{quando}}").join(quando(ctx.inicio, ctx.fim))

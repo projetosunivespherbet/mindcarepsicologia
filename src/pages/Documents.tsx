@@ -100,6 +100,7 @@ export function DocumentNew() {
   });
   const patients = useQuery({ queryKey: ["patients", ""], queryFn: () => api<Patient[]>("/patients") });
   const [comEndereco, setComEndereco] = useState(false);
+  const [semResponsavel, setSemResponsavel] = useState(false);
   const escolhido = patients.data?.find((p) => p.id === patientId);
 
   const create = useMutation({
@@ -114,6 +115,7 @@ export function DocumentNew() {
         cpf: patient.cpf,
         cns: patient.cns,
         endereco: comEndereco ? patient.endereco : null,
+        responsavel: patient.responsavel_nome && !semResponsavel ? { nome: patient.responsavel_nome, cpf: patient.responsavel_cpf, vinculo: patient.responsavel_vinculo } : null,
         inicio: params.get("inicio"),
         fim: params.get("fim"),
       };
@@ -153,6 +155,12 @@ export function DocumentNew() {
               <p className="text-muted-foreground">
                 O texto já sai com {[escolhido.cpf && "CPF", escolhido.cns && "CNS"].filter(Boolean).join(" e ") || "o nome (sem CPF ou CNS cadastrados)"} do paciente.
               </p>
+              {escolhido.responsavel_nome && (
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={!semResponsavel} onChange={(e) => setSemResponsavel(!e.target.checked)} />
+                  Incluir o responsável legal ({escolhido.responsavel_nome})
+                </label>
+              )}
               {escolhido.endereco ? (
                 <label className="flex items-center gap-2">
                   <input type="checkbox" checked={comEndereco} onChange={(e) => setComEndereco(e.target.checked)} />

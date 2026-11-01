@@ -101,6 +101,12 @@ export function SessionCard({
                 <Info rotulo="E-mail" valor={patient?.email} />
                 <Info rotulo="CPF" valor={patient?.cpf ? formatCpf(patient.cpf) : null} />
                 <Info rotulo="CNS" valor={patient?.cns ? formatCns(patient.cns) : null} />
+                {patient?.responsavel_nome && (
+                  <Info
+                    rotulo="Responsável legal"
+                    valor={`${patient.responsavel_nome}${patient.responsavel_vinculo ? ` (${patient.responsavel_vinculo})` : ""}${patient.responsavel_telefone ? ` · ${patient.responsavel_telefone}` : ""}`}
+                  />
+                )}
               </dl>
             </section>
 

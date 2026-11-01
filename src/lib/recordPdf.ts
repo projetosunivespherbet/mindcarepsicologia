@@ -2,7 +2,7 @@ import { jsPDF } from "jspdf";
 import { formatCns, formatCpf } from "@shared/documents";
 
 export interface RecordExport {
-  paciente: { nome: string; cpf: string | null; cns: string | null; data_nascimento: string | null };
+  paciente: { nome: string; cpf: string | null; cns: string | null; data_nascimento: string | null; responsavel_nome?: string | null; responsavel_cpf?: string | null; responsavel_vinculo?: string | null };
   profissional: { nome: string; crp: string | null } | null;
   clinica: string;
   itens: { appointment_id: string; starts_at: string; ends_at: string; status: string; conteudo: string; anotacoes: string | null }[];
@@ -43,6 +43,8 @@ export function renderRecordPdf(d: RecordExport): jsPDF {
   if (d.paciente.data_nascimento) write(`Nascimento: ${d.paciente.data_nascimento.split("-").reverse().join("/")}`);
   if (d.paciente.cpf) write(`CPF: ${formatCpf(d.paciente.cpf)}`);
   if (d.paciente.cns) write(`CNS: ${formatCns(d.paciente.cns)}`);
+  if (d.paciente.responsavel_nome)
+    write(`Responsável legal: ${d.paciente.responsavel_nome}${d.paciente.responsavel_vinculo ? ` (${d.paciente.responsavel_vinculo})` : ""}${d.paciente.responsavel_cpf ? ` · CPF ${formatCpf(d.paciente.responsavel_cpf)}` : ""}`);
   if (d.profissional) write(`Psicólogo(a): ${d.profissional.nome}${d.profissional.crp ? ` · CRP ${d.profissional.crp}` : ""}`, 11, "normal", 4);
 
   for (const it of d.itens) {

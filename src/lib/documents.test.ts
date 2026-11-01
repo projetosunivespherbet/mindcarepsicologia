@@ -11,6 +11,9 @@ describe("modelos de documento", () => {
     expect(identificacaoPaciente(null, null)).toBe("");
     expect(identificacaoPaciente("52998224725", null, "Rua A, 10, Centro, Cajamar/SP")).toBe(", portador do CPF 529.982.247-25, residente em Rua A, 10, Centro, Cajamar/SP,");
     expect(identificacaoPaciente(null, null, "Rua A, 10")).toBe(", residente em Rua A, 10,");
+    expect(identificacaoPaciente("52998224725", null, null, { nome: "Maria Souza", cpf: "11144477735", vinculo: "mãe" })).toBe(
+      ", portador do CPF 529.982.247-25, representado(a) por Maria Souza (mãe), responsável legal, CPF 111.444.777-35,",
+    );
   });
 
   it("a declaração de comparecimento traz CPF, CNS e o horário da sessão", () => {

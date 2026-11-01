@@ -35,6 +35,10 @@ function DataForm({ patient }: { patient: PatientDetailType }) {
     cpf: patient.cpf ?? "",
     cns: patient.cns ?? "",
     endereco: patient.endereco ?? "",
+    responsavel_nome: patient.responsavel_nome ?? "",
+    responsavel_cpf: patient.responsavel_cpf ?? "",
+    responsavel_vinculo: patient.responsavel_vinculo ?? "",
+    responsavel_telefone: patient.responsavel_telefone ?? "",
     data_nascimento: patient.data_nascimento ?? "",
     telefone: patient.telefone ?? "",
     email: patient.email ?? "",
@@ -53,6 +57,10 @@ function DataForm({ patient }: { patient: PatientDetailType }) {
           cpf: f.cpf.trim() || null,
           cns: f.cns.trim() || null,
           endereco: f.endereco.trim() || null,
+          responsavel_nome: f.responsavel_nome.trim() || null,
+          responsavel_cpf: f.responsavel_cpf.trim() || null,
+          responsavel_vinculo: f.responsavel_vinculo.trim() || null,
+          responsavel_telefone: f.responsavel_telefone.trim() || null,
           data_nascimento: f.data_nascimento || null,
           telefone: f.telefone || null,
           email: f.email || null,
@@ -117,6 +125,32 @@ function DataForm({ patient }: { patient: PatientDetailType }) {
         <Label htmlFor="d-prof">Profissão</Label>
         <Input id="d-prof" value={f.profissao} onChange={set("profissao")} />
       </div>
+      <fieldset className="grid gap-4 rounded-lg border p-3 sm:col-span-2 sm:grid-cols-2">
+        <legend className="px-1 text-sm font-medium">Responsável legal (criança, adolescente ou pessoa sob curatela)</legend>
+        <div className="space-y-2">
+          <Label htmlFor="d-rl-nome">Nome do responsável</Label>
+          <Input id="d-rl-nome" value={f.responsavel_nome} onChange={set("responsavel_nome")} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="d-rl-vinc">Vínculo</Label>
+          <Input id="d-rl-vinc" list="vinculos" placeholder="mãe, pai, tutor(a), curador(a)" value={f.responsavel_vinculo} onChange={set("responsavel_vinculo")} />
+          <datalist id="vinculos">
+            <option value="mãe" />
+            <option value="pai" />
+            <option value="tutor(a)" />
+            <option value="curador(a)" />
+            <option value="guardião(ã)" />
+          </datalist>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="d-rl-cpf">CPF do responsável</Label>
+          <Input id="d-rl-cpf" inputMode="numeric" placeholder="000.000.000-00" value={f.responsavel_cpf} onChange={set("responsavel_cpf")} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="d-rl-tel">Telefone do responsável</Label>
+          <Input id="d-rl-tel" value={f.responsavel_telefone} onChange={set("responsavel_telefone")} />
+        </div>
+      </fieldset>
       {user?.role !== "psicologo" && (
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor="d-resp">Psicólogo responsável</Label>
