@@ -187,7 +187,7 @@ describe("pré-cadastro e convites", () => {
     const psi = await mkUser(adminToken, { nome: "Psi Lista", role: "psicologo", crp: "06/55" });
     const rec = await mkUser(adminToken, { nome: "Rec Lista", role: "recepcao" });
     const r = await call("GET", "/professionals", { token: rec.token });
-    expect(r.json).toEqual([{ id: psi.id, nome: "Psi Lista", crp: "06/55" }]);
+    expect(r.json).toEqual([{ id: psi.id, nome: "Psi Lista", crp: "06/55", pix_chave: null }]);
     expect((await call("GET", "/professionals")).status).toBe(401);
   });
 

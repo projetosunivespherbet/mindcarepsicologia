@@ -24,7 +24,7 @@ async function cenario() {
 type S = Awaited<ReturnType<typeof cenario>>;
 
 const cobrar = async (s: S, extra: Record<string, unknown> = {}) =>
-  (await call("POST", "/charges", { token: s.psi.token, body: { patient_id: s.pac.id, competencia: `${MES}-01`, valor_centavos: 25000, ...extra } })).json;
+  (await call("POST", "/charges", { token: s.psi.token, body: { patient_id: s.pac.id, competencia: MES, valor_centavos: 25000, ...extra } })).json;
 const pagar = (s: S, chargeId: string, dia: string, extra: Record<string, unknown> = {}) =>
   call("POST", `/charges/${chargeId}/payments`, { token: s.rec.token, headers: { "Idempotency-Key": uniq("idem-key-") }, body: { valor_centavos: 25000, metodo: "pix", pago_em: `${MES}-${dia}`, ...extra } });
 const exportar = (token: string, query = `month=${MES}`) => call("GET", `/finance/receita-saude?${query}`, { token });
@@ -72,7 +72,7 @@ describe("exportação para o Receita Saúde", () => {
 
     await call("PATCH", `/users/${s.psi.id}`, { token: s.adminToken, body: { cpf: CPF_PSI } });
     const pacSemCpf = (await call("POST", "/patients", { token: s.psi.token, body: { nome: "Paciente Sem CPF" } })).json;
-    const ch2 = (await call("POST", "/charges", { token: s.psi.token, body: { patient_id: pacSemCpf.id, competencia: `${MES}-01`, valor_centavos: 10000 } })).json;
+    const ch2 = (await call("POST", "/charges", { token: s.psi.token, body: { patient_id: pacSemCpf.id, competencia: MES, valor_centavos: 10000 } })).json;
     await pagar(s, ch2.id, "06", { valor_centavos: 10000 });
     const pj = (await call("POST", "/payers", { token: s.psi.token, body: { nome: "Empresa Ltda", cpf_cnpj: "11222333000181" } })).json;
     const ch3 = await cobrar(s, { payer_id: pj.id });

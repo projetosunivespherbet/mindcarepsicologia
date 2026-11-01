@@ -312,6 +312,7 @@ export default function Users() {
               </div>
             )}
             {eAtende && (
+              <>
               <div className="space-y-2">
                 <Label htmlFor="e-cpf">CPF (opcional)</Label>
                 <Input id="e-cpf" inputMode="numeric" placeholder="000.000.000-00" value={eform.cpf} onChange={(e) => setEform({ ...eform, cpf: e.target.value })} />
@@ -322,7 +323,7 @@ export default function Users() {
                 <Input id="e-pix" placeholder="CPF, e-mail, +5511999998888 ou chave aleatória" value={eform.pix} onChange={(e) => setEform({ ...eform, pix: e.target.value })} />
                 <p className="text-xs text-muted-foreground">Usada no Pix copia e cola das cobranças.</p>
               </div>
-
+              </>
             )}
             <div className="space-y-2">
               <Label htmlFor="e-tel">Telefone (opcional)</Label>

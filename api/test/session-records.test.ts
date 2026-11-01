@@ -13,7 +13,7 @@ async function cenario() {
   const rec = await mkUser(c.adminToken, { nome: "Rita Recepção", role: "recepcao" });
   const pac = (await call("POST", "/patients", { token: psiA.token, body: { nome: "Paciente Um" } })).json;
   const sessao = async (dia: number, status?: string) => {
-    const ap = (await call("POST", "/appointments", { token: psiA.token, body: { patient_id: pac.id, starts_at: at(dia, "09:00"), ends_at: at(dia, "10:00") } })).json;
+    const ap = (await call("POST", "/appointments", { token: psiA.token, body: { patient_id: pac.id, starts_at: at(dia, "09:00"), ends_at: at(dia, "10:00"), valor: 200 } })).json;
     if (status) await call("PATCH", `/appointments/${ap.id}`, { token: psiA.token, body: { status } });
     return ap.id as string;
   };
@@ -55,8 +55,8 @@ describe("prontuário da sessão", () => {
 
     // sessão passada: inserida direto pelo dono do banco para simular o histórico
     const passada = await ownerPool.query(
-      `INSERT INTO appointments (clinic_id, patient_id, professional_id, starts_at, ends_at, status, created_by)
-       VALUES ($1, $2, $3, now() - interval '3 days', now() - interval '3 days' + interval '50 minutes', 'realizado', $3) RETURNING id`,
+      `INSERT INTO appointments (clinic_id, patient_id, professional_id, starts_at, ends_at, status, valor, created_by)
+       VALUES ($1, $2, $3, now() - interval '3 days', now() - interval '3 days' + interval '50 minutes', 'realizado', 200, $3) RETURNING id`,
       [s.c.clinicId, s.pac.id, s.psiA.id],
     );
     const idPassada = passada.rows[0].id as string;
