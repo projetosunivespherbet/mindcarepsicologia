@@ -335,6 +335,7 @@ describe.skipIf(!process.env.E2E_PG)("fluxo completo: telas + API + Postgres", (
     });
     expect(await screen.findByText(/R\$\s?120,00/, { selector: "button" }, { timeout: 5000 })).toBeInTheDocument();
 
+    await user.click(screen.getByRole("tab", { name: "Serviços" }));
     await user.type(screen.getByLabelText("Nome"), "Sessão individual");
     await user.type(screen.getByLabelText("Valor (R$)"), "200,00");
     await user.click(screen.getByRole("button", { name: "Adicionar" }));
