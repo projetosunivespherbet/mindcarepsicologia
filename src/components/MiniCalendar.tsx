@@ -11,7 +11,7 @@ export function monthGridRange(ym: string): { first: Date; last: Date } {
   return { first, last };
 }
 
-const WEEKDAYS = ["S", "T", "Q", "Q", "S", "S", "D"];
+const WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
 /** Calendário do mês: dia selecionado em destaque e um ponto nos dias que têm sessões. */
 export function MiniCalendar({
@@ -33,7 +33,8 @@ export function MiniCalendar({
   const cells = Array.from({ length: weeks * 7 }, (_, i) => toDateStr(addDays(first, i)));
   const today = toDateStr(new Date());
   const shift = (n: number) => onMonth(toDateStr(new Date(y, m - 1 + n, 1)).slice(0, 7));
-  const title = new Date(y, m - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const mes = new Date(y, m - 1, 1).toLocaleDateString("pt-BR", { month: "long" });
+  const title = `${mes.charAt(0).toUpperCase()}${mes.slice(1)} de ${y}`;
 
   return (
     <div className="rounded-xl border bg-card p-3" aria-label="Calendário do mês">
@@ -41,7 +42,7 @@ export function MiniCalendar({
         <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Mês anterior" onClick={() => shift(-1)}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <p className="text-sm font-semibold capitalize" aria-live="polite">
+        <p className="text-sm font-semibold" aria-live="polite">
           {title}
         </p>
         <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Próximo mês" onClick={() => shift(1)}>
@@ -50,7 +51,7 @@ export function MiniCalendar({
       </div>
       <div className="grid grid-cols-7 gap-y-1 text-center text-xs">
         {WEEKDAYS.map((d, i) => (
-          <span key={i} className="py-1 text-muted-foreground">
+          <span key={i} className="py-1 text-[11px] text-muted-foreground">
             {d}
           </span>
         ))}

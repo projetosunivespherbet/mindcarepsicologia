@@ -162,6 +162,14 @@ export default function Finance() {
   const pending = useQuery({ queryKey: ["pending-invoices"], queryFn: () => api<{ total_centavos: number; itens: Charge[] }>("/finance/pending-invoices") });
   const receivables = useQuery({ queryKey: ["receivables"], queryFn: () => api<Receivables>("/finance/receivables"), enabled: canBulk });
 
+  // Os três primeiros cartões olham as mesmas cobranças (as deste mês): cobrado = pago + falta receber.
+  const ativas = (charges.data ?? []).filter((c) => c.status !== "cancelada");
+  const doMes = {
+    cobrado: ativas.reduce((t, c) => t + c.liquido_centavos, 0),
+    pago: ativas.reduce((t, c) => t + Math.min(c.paid_centavos, c.liquido_centavos), 0),
+    falta: ativas.reduce((t, c) => t + Math.max(c.saldo_centavos, 0), 0),
+  };
+
   const generate = useMutation({
     mutationFn: () =>
       api<{ criadas: number; sem_valor: number }>("/charges/generate", {
@@ -188,10 +196,10 @@ export default function Finance() {
       </div>
 
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-        <Stat label="Cobrado no mês" hint="Total das cobranças geradas, pagas ou não" value={summary.data?.faturado_centavos ?? 0} />
-        <Stat label="Recebido no mês" hint="O que já foi pago" value={summary.data?.recebido_centavos ?? 0} />
-        <Stat label="A receber" hint="Cobrado e ainda não pago" value={summary.data?.em_aberto_centavos ?? 0} />
-        <Stat label="Atrasado" hint="A receber com vencimento passado" value={summary.data?.atrasado_centavos ?? 0} tone="bad" />
+        <Stat label="Cobrado no mês" hint="Cobranças deste mês" value={doMes.cobrado} />
+        <Stat label="Pago" hint="Quanto dessas cobranças já foi pago" value={doMes.pago} />
+        <Stat label="Falta receber" hint="Quanto dessas cobranças ainda não foi pago" value={doMes.falta} />
+        <Stat label="Em atraso (todos os meses)" hint="Cobranças vencidas e não pagas, de qualquer mês" value={summary.data?.atrasado_centavos ?? 0} tone="bad" />
       </div>
 
       <Tabs defaultValue="cobrancas" className="space-y-4">
@@ -271,15 +279,15 @@ export default function Finance() {
         <Card>
           <CardHeader>
             <CardTitle>Por profissional</CardTitle>
-            <CardDescription>Cobrado e recebido no mês; a receber e atrasado são o saldo atual.</CardDescription>
+            <CardDescription>"Entrou no caixa" soma os pagamentos recebidos no mês, inclusive de cobranças de meses anteriores. "A receber" e "Atrasado" são o saldo atual de todos os meses.</CardDescription>
           </CardHeader>
           <CardContent>
             <ul className="divide-y rounded-xl border bg-card">
               {summary.data?.por_profissional.map((p) => (
                 <li key={p.professional_id} className="grid gap-1 p-3 text-sm sm:grid-cols-5 sm:items-center">
                   <span className="font-medium sm:col-span-1">{p.nome}</span>
-                  <span>Cobrado {brl(p.faturado_centavos)}</span>
-                  <span>Recebido {brl(p.recebido_centavos)}</span>
+                  <span>Cobrado no mês {brl(p.faturado_centavos)}</span>
+                  <span>Entrou no caixa {brl(p.recebido_centavos)}</span>
                   <span>A receber {brl(p.em_aberto_centavos)}</span>
                   <span className={p.atrasado_centavos > 0 ? "text-destructive" : ""}>Atrasado {brl(p.atrasado_centavos)}</span>
                 </li>

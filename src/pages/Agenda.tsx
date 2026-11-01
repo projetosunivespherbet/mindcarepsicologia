@@ -427,7 +427,7 @@ function WeekGrid({
           <div />
           {perDay.map(({ d, items }) => (
             <div key={d} className={`border-l px-2 py-2 text-center ${d === selected ? "bg-primary/20 ring-1 ring-inset ring-primary" : d === today ? "bg-primary/10" : ""}`}>
-              <p className="text-xs font-semibold capitalize">{new Date(`${d}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")}</p>
+              <p className="text-xs font-semibold">{dayLabel(d).split(",")[0]}</p>
               <p className="text-xs text-muted-foreground">{d.split("-").reverse().slice(0, 2).join("/")}</p>
               {showFree && <p className="text-[11px] text-emerald-700 dark:text-emerald-400">{fmtFree(freeMinutes(items))} livres</p>}
             </div>
@@ -578,7 +578,8 @@ export default function Agenda() {
   const byDay = new Map<string, Appointment[]>();
   const blocksByDay = new Map<string, TimeBlock[]>();
   for (const b of blocks.data ?? []) blocksByDay.set(dayKey(b.starts_at), [...(blocksByDay.get(dayKey(b.starts_at)) ?? []), b]);
-  for (const a of appts.data ?? []) byDay.set(dayKey(a.starts_at), [...(byDay.get(dayKey(a.starts_at)) ?? []), a]);
+  // A lista mostra só o que está de pé: sessões canceladas ficam no histórico da sessão e da ficha.
+  for (const a of (appts.data ?? []).filter((x) => x.status !== "cancelado")) byDay.set(dayKey(a.starts_at), [...(byDay.get(dayKey(a.starts_at)) ?? []), a]);
 
   const setStatus = useMutation({
     mutationFn: async ({ a, status }: { a: Appointment; status: AppointmentStatus }) => {

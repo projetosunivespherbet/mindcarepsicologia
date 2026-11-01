@@ -83,10 +83,8 @@ export function SessionCard({
               <Badge variant={STATUS[a.status].variant}>{STATUS[a.status].label}</Badge>
               {a.atendimento !== "particular" && <Badge variant="outline">{a.atendimento === "pro_bono" ? "Pro bono" : "Convênio"}</Badge>}
               {a.status === "realizado" && a.valor ? <Badge variant={a.payment_status === "pago" ? "default" : "outline"}>{a.payment_status === "pago" ? "Pago" : "A receber"}</Badge> : null}
-              {a.status === "realizado" && a.atendimento === "particular" && (
-                <Badge variant={a.nota_status === "emitida" ? "default" : "secondary"}>
-                  {a.nota_status === "emitida" ? "Nota emitida" : a.nota_status === "rascunho" ? "Nota em rascunho" : "Sem nota"}
-                </Badge>
+              {a.status === "realizado" && a.nota_status && (
+                <Badge variant={a.nota_status === "emitida" ? "default" : "secondary"}>{a.nota_status === "emitida" ? "Nota emitida" : "Nota em rascunho"}</Badge>
               )}
               {a.status === "realizado" && a.prontuario !== null && (
                 <Badge variant={a.prontuario ? "default" : "outline"} className={a.prontuario ? "" : "border-amber-500 text-amber-700 dark:text-amber-400"}>
