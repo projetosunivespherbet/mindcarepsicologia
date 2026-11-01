@@ -1,10 +1,11 @@
 import { useState, type FormEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, FilePlus2 } from "lucide-react";
 import { toast } from "sonner";
 import { DocStatusBadge } from "@/components/DocStatusBadge";
 import { PatientCharges } from "@/components/PatientCharges";
+import { PatientRecords } from "@/components/PatientRecords";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ function DataForm({ patient }: { patient: PatientDetailType }) {
   const [f, setF] = useState({
     nome: patient.nome,
     cpf: patient.cpf ?? "",
+    cns: patient.cns ?? "",
     data_nascimento: patient.data_nascimento ?? "",
     telefone: patient.telefone ?? "",
     email: patient.email ?? "",
@@ -48,6 +50,7 @@ function DataForm({ patient }: { patient: PatientDetailType }) {
         body: {
           nome: f.nome,
           cpf: f.cpf.trim() || null,
+          cns: f.cns.trim() || null,
           data_nascimento: f.data_nascimento || null,
           telefone: f.telefone || null,
           email: f.email || null,
@@ -79,6 +82,10 @@ function DataForm({ patient }: { patient: PatientDetailType }) {
       <div className="space-y-2">
         <Label htmlFor="d-cpf">CPF</Label>
         <Input id="d-cpf" inputMode="numeric" placeholder="000.000.000-00" value={f.cpf} onChange={set("cpf")} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="d-cns">CNS (Cartão Nacional de Saúde)</Label>
+        <Input id="d-cns" inputMode="numeric" placeholder="000 0000 0000 0000" value={f.cns} onChange={set("cns")} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="d-nasc">Nascimento</Label>
@@ -189,6 +196,7 @@ export default function PatientDetail() {
   const { user, canProduceDocuments } = useAuth();
   const q = useQuery({ queryKey: ["patient", id], queryFn: () => api<PatientDetailType>(`/patients/${id}`), retry: false });
   const p = q.data;
+  const [params] = useSearchParams();
 
   const canClinical = !!user && !!p && ((user.role === "psicologo" && p.professional_id === user.id) || (user.role === "admin" && user.atende));
 
@@ -208,9 +216,10 @@ export default function PatientDetail() {
             <CardDescription>{p.ativo ? "Paciente ativo" : "Paciente inativo"}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="dados">
+            <Tabs defaultValue={canClinical && params.get("sessao") ? "prontuario" : "dados"}>
               <TabsList>
                 <TabsTrigger value="dados">Dados</TabsTrigger>
+                {canClinical && <TabsTrigger value="prontuario">Prontuário</TabsTrigger>}
                 <TabsTrigger value="anamnese">Anamnese</TabsTrigger>
                 {canProduceDocuments && <TabsTrigger value="documentos">Documentos</TabsTrigger>}
                 <TabsTrigger value="cobrancas">Cobranças</TabsTrigger>
@@ -218,6 +227,11 @@ export default function PatientDetail() {
               <TabsContent value="dados" className="pt-4">
                 <DataForm key={`${p.id}-${p.nome}`} patient={p} />
               </TabsContent>
+              {canClinical && (
+                <TabsContent value="prontuario" className="pt-4">
+                  <PatientRecords patientId={p.id} />
+                </TabsContent>
+              )}
               <TabsContent value="anamnese" className="pt-4">
                 {canClinical ? (
                   <AnamnesisForm key={p.id} patient={p} />

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarDays, ChevronLeft, ChevronRight, List, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -9,23 +9,15 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
-import { ApiError, api, errMsg } from "@/lib/api";
+import { api, errMsg } from "@/lib/api";
 import { addDays, addMinutes, dayKey, dayLabel, hhmm, localInstant, minutesBetween, timeInput, toDateStr, weekStart } from "@/lib/dates";
 import { brl, centsToInput, parseBRL } from "@/lib/money";
-import { downloadIcs, icsContent, reminderText, whatsappNumber, whatsappUrl } from "@/lib/reminder";
+import { MiniCalendar, monthGridRange } from "@/components/MiniCalendar";
+import { SessionCard, STATUS } from "@/components/SessionCard";
+import { avisoRealizada, marcarRealizada } from "@/lib/session";
 import { ChangeHistory } from "@/components/ChangeHistory";
 import type { Appointment, AppointmentStatus, Atendimento, Patient, Professional, TimeBlock } from "@/lib/types";
-
-const STATUS: Record<AppointmentStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  agendado: { label: "Agendado", variant: "secondary" },
-  confirmado: { label: "Confirmado", variant: "outline" },
-  realizado: { label: "Realizado", variant: "default" },
-  faltou: { label: "Faltou", variant: "destructive" },
-  cancelado: { label: "Cancelado", variant: "destructive" },
-};
 
 const ATENDIMENTOS: { value: Atendimento; label: string }[] = [
   { value: "particular", label: "Particular" },
@@ -296,82 +288,9 @@ function BlockDialog({ open, onClose, pros, defaultDate }: { open: boolean; onCl
   );
 }
 
-// ---------------------------------------------------------------- prontuário da sessão
+// ---------------------------------------------------------------- prontuário pendente
 
 type RecordTarget = Pick<Appointment, "id" | "patient_id" | "starts_at">;
-
-function RecordDialog({ target, patientName, onClose }: { target: RecordTarget | null; patientName: string; onClose: () => void }) {
-  const qc = useQueryClient();
-  const [text, setText] = useState("");
-  // Dado clínico: não fica guardado em cache depois que a janela fecha.
-  const rec = useQuery({
-    queryKey: ["record", target?.id],
-    enabled: !!target,
-    gcTime: 0,
-    refetchOnWindowFocus: false,
-    queryFn: () => api<{ conteudo: string | null }>(`/appointments/${target!.id}/record`),
-  });
-
-  useEffect(() => {
-    if (!target) setText("");
-    else if (rec.data) setText(rec.data.conteudo ?? "");
-  }, [target?.id, rec.data]);
-
-  const save = useMutation({
-    mutationFn: () => api(`/appointments/${target!.id}/record`, { method: "PUT", body: { conteudo: text } }),
-    onSuccess: () => {
-      toast.success("Prontuário salvo");
-      void qc.invalidateQueries({ queryKey: ["appointments"] });
-      void qc.invalidateQueries({ queryKey: ["pending-records"] });
-      onClose();
-    },
-    onError: (e) => toast.error(errMsg(e)),
-  });
-
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    if (!text.trim()) return toast.error("Escreva o registro da sessão");
-    save.mutate();
-  };
-
-  return (
-    <Dialog open={!!target} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Prontuário da sessão</DialogTitle>
-          <DialogDescription>
-            {patientName}
-            {target ? ` · ${new Date(target.starts_at).toLocaleDateString("pt-BR")} às ${hhmm(target.starts_at)}` : ""}. Conteúdo confidencial: só você tem acesso.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={submit} className="space-y-3">
-          <Label htmlFor="rec-text" className="sr-only">
-            Registro da sessão
-          </Label>
-          <Textarea
-            id="rec-text"
-            rows={12}
-            maxLength={20000}
-            disabled={rec.isLoading}
-            placeholder="Registre a sessão: demanda trazida, intervenções, evolução, combinados e encaminhamentos."
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-          />
-          {rec.isError && <p className="text-sm text-destructive">{errMsg(rec.error)}</p>}
-          <p className="text-xs text-muted-foreground text-right">{text.length}/20000</p>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={rec.isLoading || rec.isError || save.isPending}>
-              {save.isPending ? "Salvando..." : "Salvar prontuário"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 // ---------------------------------------------------------------- grade semanal
 
@@ -453,6 +372,7 @@ const GRID_STATUS_CLASS: Record<AppointmentStatus, string> = {
 };
 
 function WeekGrid({
+  selected,
   days,
   appts,
   blocks,
@@ -461,6 +381,7 @@ function WeekGrid({
   onSelect,
   onPickSlot,
 }: {
+  selected: string;
   days: string[];
   appts: Appointment[];
   blocks: TimeBlock[];
@@ -501,7 +422,7 @@ function WeekGrid({
         <div className="grid border-b bg-muted/40" style={cols}>
           <div />
           {perDay.map(({ d, items }) => (
-            <div key={d} className={`border-l px-2 py-2 text-center ${d === today ? "bg-primary/10" : ""}`}>
+            <div key={d} className={`border-l px-2 py-2 text-center ${d === selected ? "bg-primary/20 ring-1 ring-inset ring-primary" : d === today ? "bg-primary/10" : ""}`}>
               <p className="text-xs font-semibold capitalize">{new Date(`${d}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")}</p>
               <p className="text-xs text-muted-foreground">{d.split("-").reverse().slice(0, 2).join("/")}</p>
               {showFree && <p className="text-[11px] text-emerald-700 dark:text-emerald-400">{fmtFree(freeMinutes(items))} livres</p>}
@@ -576,7 +497,15 @@ export default function Agenda() {
   const { user, canProduceDocuments: canRecord } = useAuth();
   const qc = useQueryClient();
   const isPsi = user?.role === "psicologo";
-  const [anchor, setAnchor] = useState(() => weekStart(new Date()));
+  const navigate = useNavigate();
+  const [selected, setSelected] = useState(() => toDateStr(new Date()));
+  const [month, setMonth] = useState(() => toDateStr(new Date()).slice(0, 7));
+  const anchor = useMemo(() => weekStart(new Date(`${selected}T12:00:00`)), [selected]);
+  const goTo = (d: string) => {
+    setSelected(d);
+    setMonth(d.slice(0, 7));
+  };
+  const shiftWeek = (n: number) => goTo(toDateStr(addDays(new Date(`${selected}T12:00:00`), 7 * n)));
   const [pro, setPro] = useState("");
   const [editing, setEditing] = useState<Appointment | null>(null);
   const [creating, setCreating] = useState(false);
@@ -593,7 +522,6 @@ export default function Agenda() {
   });
   const [slot, setSlot] = useState<{ date: string; time: string } | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
-  const [recording, setRecording] = useState<RecordTarget | null>(null);
   const changeView = (v: "grade" | "lista") => {
     setView(v);
     try {
@@ -621,12 +549,18 @@ export default function Agenda() {
     },
     onError: (e) => toast.error(errMsg(e)),
   });
+  const grid = monthGridRange(month);
+  const monthAppts = useQuery({
+    queryKey: ["appointments", "month", month, pro],
+    queryFn: () => api<Appointment[]>(`/appointments?from=${encodeURIComponent(grid.first.toISOString())}&to=${encodeURIComponent(grid.last.toISOString())}${pro ? `&professional_id=${pro}` : ""}`),
+  });
+  const marked = useMemo(() => new Set((monthAppts.data ?? []).filter((a) => a.status !== "cancelado").map((a) => dayKey(a.starts_at))), [monthAppts.data]);
   const pending = useQuery({ queryKey: ["pending-records"], enabled: canRecord, queryFn: () => api<RecordTarget[]>("/appointments/pending-records") });
   const patients = useQuery({ queryKey: ["patients-all"], queryFn: () => api<Patient[]>("/patients?ativo=true") });
   const pros = useQuery({ queryKey: ["professionals"], queryFn: () => api<Professional[]>("/professionals") });
 
   const patientName = useMemo(() => new Map((patients.data ?? []).map((p) => [p.id, p.nome])), [patients.data]);
-  const patientPhone = useMemo(() => new Map((patients.data ?? []).map((p) => [p.id, p.telefone])), [patients.data]);
+  const patientById = useMemo(() => new Map((patients.data ?? []).map((p) => [p.id, p])), [patients.data]);
   const proName = useMemo(() => new Map((pros.data ?? []).map((p) => [p.id, p.nome])), [pros.data]);
 
   const days = Array.from({ length: 7 }, (_, i) => toDateStr(addDays(anchor, i)));
@@ -637,25 +571,16 @@ export default function Agenda() {
 
   const setStatus = useMutation({
     mutationFn: async ({ a, status }: { a: Appointment; status: AppointmentStatus }) => {
+      if (status === "realizado") return { cobranca: await marcarRealizada(a) };
       await api(`/appointments/${a.id}`, { method: "PATCH", body: { status } });
-      if (status !== "realizado") return { cobranca: "nao-se-aplica" as const };
-      if (a.atendimento === "pro_bono") return { cobranca: "pro-bono" as const };
-      // sessão realizada gera a cobrança (se houver valor)
-      try {
-        await api("/charges", { body: { patient_id: a.patient_id, appointment_id: a.id } });
-        return { cobranca: "criada" as const };
-      } catch (e) {
-        return { cobranca: e instanceof ApiError && e.status === 409 ? ("ja-existia" as const) : ("sem-valor" as const) };
-      }
+      return { cobranca: null };
     },
     onSuccess: ({ cobranca }, { status }) => {
       void qc.invalidateQueries({ queryKey: ["appointments"] });
       void qc.invalidateQueries({ queryKey: ["charges"] });
-      if (status !== "realizado") toast.success(`Sessão marcada como ${STATUS[status].label.toLowerCase()}`);
-      else if (cobranca === "criada") toast.success("Sessão realizada e cobrança criada");
-      else if (cobranca === "pro-bono") toast.success("Sessão pro bono registrada, sem cobrança");
-      else if (cobranca === "sem-valor") toast.warning("Sessão realizada, mas a cobrança não foi criada. Use Remarcar para informar o valor.");
-      else toast.success("Sessão realizada");
+      setDetail(null);
+      if (cobranca) avisoRealizada(cobranca);
+      else toast.success(`Sessão marcada como ${STATUS[status].label.toLowerCase()}`);
     },
     onError: (e) => toast.error(errMsg(e)),
   });
@@ -668,97 +593,28 @@ export default function Agenda() {
     setDetail(null);
     setHistory(id);
   };
-  const openRecord = (a: Appointment) => {
-    setDetail(null);
-    setRecording(a);
-  };
   const pickSlot = (date: string, time: string) => {
     setSlot({ date, time });
     setCreating(true);
   };
 
-  const actions = (a: Appointment) => {
-    const open = a.status === "agendado" || a.status === "confirmado";
-    // Realizada e falta só valem depois que a sessão começou (cancelar e confirmar podem ser feitos antes).
-    const started = new Date(a.starts_at).getTime() <= Date.now();
-    const wait = started ? undefined : "Disponível a partir do horário de início da sessão";
-    return (
-                      <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant={STATUS[a.status].variant}>{STATUS[a.status].label}</Badge>
-                          {a.atendimento !== "particular" && <Badge variant="outline">{a.atendimento === "pro_bono" ? "Pro bono" : "Convênio"}</Badge>}
-                          {a.status === "realizado" && a.valor ? <Badge variant={a.payment_status === "pago" ? "default" : "outline"}>{a.payment_status === "pago" ? "Pago" : "A receber"}</Badge> : null}
-                          {a.status === "realizado" && a.atendimento === "particular" && (
-                            <Badge variant={a.nota_status === "emitida" ? "default" : "secondary"}>
-                              {a.nota_status === "emitida" ? "Nota emitida" : a.nota_status === "rascunho" ? "Nota em rascunho" : "Sem nota"}
-                            </Badge>
-                          )}
-                          {a.status === "realizado" && a.prontuario !== null && (
-                            <Badge variant={a.prontuario ? "default" : "outline"} className={a.prontuario ? "" : "border-amber-500 text-amber-700 dark:text-amber-400"}>
-                              {a.prontuario ? "Prontuário preenchido" : "Prontuário pendente"}
-                            </Badge>
-                          )}
-                          {open && (
-                            <>
-                              {a.status === "agendado" && (
-                                <Button size="sm" variant="outline" disabled={setStatus.isPending} onClick={() => setStatus.mutate({ a, status: "confirmado" })}>
-                                  Confirmar
-                                </Button>
-                              )}
-                              <Button size="sm" disabled={setStatus.isPending || !started} title={wait} onClick={() => setStatus.mutate({ a, status: "realizado" })}>
-                                Realizada
-                              </Button>
-                              <Button size="sm" variant="outline" disabled={setStatus.isPending || !started} title={wait} onClick={() => setStatus.mutate({ a, status: "faltou" })}>
-                                Faltou
-                              </Button>
-                              <Button size="sm" variant="ghost" disabled={setStatus.isPending} onClick={() => setStatus.mutate({ a, status: "cancelado" })}>
-                                Cancelar
-                              </Button>
-                            </>
-                          )}
-                          {a.status !== "cancelado" && (
-                            <Button size="sm" variant="ghost" onClick={() => openEdit(a)}>
-                              Remarcar
-                            </Button>
-                          )}
-                          {open && (
-                            <>
-                              {whatsappNumber(patientPhone.get(a.patient_id)) && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() =>
-                                    window.open(
-                                      whatsappUrl(whatsappNumber(patientPhone.get(a.patient_id))!, reminderText({ paciente: patientName.get(a.patient_id) ?? "", clinica: user?.clinic_nome ?? "", starts_at: a.starts_at, ends_at: a.ends_at })),
-                                      "_blank",
-                                      "noopener",
-                                    )
-                                  }
-                                >
-                                  Lembrete (WhatsApp)
-                                </Button>
-                              )}
-                              <Button size="sm" variant="ghost" onClick={() => downloadIcs(`sessao-${dayKey(a.starts_at)}.ics`, icsContent({ id: a.id, clinica: user?.clinic_nome ?? "", starts_at: a.starts_at, ends_at: a.ends_at }))}>
-                                Arquivo de agenda
-                              </Button>
-                            </>
-                          )}
-                          {a.prontuario !== null && (a.status === "realizado" || a.status === "faltou") && (
-                            <Button size="sm" variant={a.prontuario ? "ghost" : "outline"} onClick={() => openRecord(a)}>
-                              {a.prontuario ? "Abrir prontuário" : "Preencher prontuário"}
-                            </Button>
-                          )}
-                          {user?.role === "admin" && (
-                            <Button size="sm" variant="ghost" onClick={() => openHistory(a.id)}>
-                              Histórico
-                            </Button>
-                          )}
-                        </div>
-    );
-  };
+  const badges = (a: Appointment) => (
+    <div className="flex flex-wrap items-center gap-2">
+      <Badge variant={STATUS[a.status].variant}>{STATUS[a.status].label}</Badge>
+      {a.atendimento !== "particular" && <Badge variant="outline">{a.atendimento === "pro_bono" ? "Pro bono" : "Convênio"}</Badge>}
+      {a.status === "realizado" && a.prontuario !== null && (
+        <Badge variant={a.prontuario ? "default" : "outline"} className={a.prontuario ? "" : "border-amber-500 text-amber-700 dark:text-amber-400"}>
+          {a.prontuario ? "Prontuário preenchido" : "Prontuário pendente"}
+        </Badge>
+      )}
+      <Button size="sm" variant="outline" onClick={() => setDetail(a.id)}>
+        Abrir
+      </Button>
+    </div>
+  );
 
-  // "Nova sessão" e "Bloquear horário" começam na semana que está na tela (hoje, se a semana atual estiver aberta)
-  const todayStr = toDateStr(new Date());
-  const baseDate = todayStr >= toDateStr(anchor) && todayStr < toDateStr(addDays(anchor, 7)) ? todayStr : toDateStr(anchor);
+  // "Nova sessão" e "Bloquear horário" começam no dia selecionado no calendário
+  const baseDate = selected;
   const detailAppt = (appts.data ?? []).find((a) => a.id === detail) ?? null;
 
   const rangeLabel = `${days[0]!.split("-").reverse().slice(0, 2).join("/")} a ${days[6]!.split("-").reverse().slice(0, 2).join("/")}`;
@@ -776,27 +632,25 @@ export default function Agenda() {
           </Button>
         </div>
       </div>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+      <aside className="w-full shrink-0 space-y-2 lg:w-64">
+        <MiniCalendar selected={selected} marked={marked} month={month} onMonth={setMonth} onSelect={goTo} />
+        <p className="px-1 text-xs text-muted-foreground">Os pontos marcam os dias com sessões. Clique em um dia para abri-lo na agenda.</p>
+      </aside>
+      <div className="min-w-0 flex-1 space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="outline" size="icon" aria-label="Semana anterior" onClick={() => setAnchor(addDays(anchor, -7))}>
+        <Button variant="outline" size="icon" aria-label="Semana anterior" onClick={() => shiftWeek(-1)}>
           <ChevronLeft className="w-4 h-4" />
         </Button>
-        <Button variant="outline" onClick={() => setAnchor(weekStart(new Date()))}>
+        <Button variant="outline" onClick={() => goTo(toDateStr(new Date()))}>
           Hoje
         </Button>
-        <Button variant="outline" size="icon" aria-label="Próxima semana" onClick={() => setAnchor(addDays(anchor, 7))}>
+        <Button variant="outline" size="icon" aria-label="Próxima semana" onClick={() => shiftWeek(1)}>
           <ChevronRight className="w-4 h-4" />
         </Button>
         <span className="text-sm font-medium" aria-live="polite">
           {rangeLabel}
         </span>
-        <Input
-          type="date"
-          aria-label="Ir para a data"
-          title="Ir para a semana de uma data"
-          className="w-auto"
-          value={toDateStr(anchor)}
-          onChange={(e) => e.target.value && setAnchor(weekStart(new Date(`${e.target.value}T12:00:00`)))}
-        />
         <div className="flex gap-1 ml-auto" role="group" aria-label="Modo de visualização">
           <Button size="sm" variant={view === "grade" ? "default" : "outline"} aria-pressed={view === "grade"} onClick={() => changeView("grade")}>
             <CalendarDays className="w-4 h-4 mr-1" /> Grade
@@ -827,7 +681,7 @@ export default function Agenda() {
                 <span>
                   {new Date(p.starts_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} {hhmm(p.starts_at)} · {patientName.get(p.patient_id) ?? "Paciente"}
                 </span>
-                <Button size="sm" variant="outline" onClick={() => setRecording(p)}>
+                <Button size="sm" variant="outline" onClick={() => navigate(`/pacientes/${p.patient_id}?sessao=${p.id}`)}>
                   Preencher
                 </Button>
               </li>
@@ -841,7 +695,7 @@ export default function Agenda() {
       {view === "grade" ? (
         <>
           {!isPsi && !pro && <p className="text-xs text-muted-foreground">Escolha um psicólogo no filtro para ver os horários livres de cada dia (8h às 18h). Clique em um horário vazio para marcar uma sessão.</p>}
-          <WeekGrid days={days} appts={appts.data ?? []} blocks={blocks.data ?? []} patientName={patientName} showFree={isPsi || !!pro} onSelect={(a) => setDetail(a.id)} onPickSlot={pickSlot} />
+          <WeekGrid selected={selected} days={days} appts={appts.data ?? []} blocks={blocks.data ?? []} patientName={patientName} showFree={isPsi || !!pro} onSelect={(a) => setDetail(a.id)} onPickSlot={pickSlot} />
         </>
       ) : (
       <div className="space-y-3">
@@ -849,7 +703,7 @@ export default function Agenda() {
           const list = byDay.get(d) ?? [];
           const dayBlocks = blocksByDay.get(d) ?? [];
           return (
-            <section key={d} aria-label={dayLabel(d)} className="rounded-xl border bg-card">
+            <section key={d} aria-label={dayLabel(d)} className={`rounded-xl border bg-card ${d === selected ? "ring-2 ring-primary" : ""}`}>
               <h2 className="px-3 py-2 text-sm font-semibold border-b bg-muted/40 rounded-t-xl">{dayLabel(d)}</h2>
               {dayBlocks.length > 0 && (
                 <ul className="divide-y border-b bg-muted/20">
@@ -889,7 +743,7 @@ export default function Agenda() {
                             {a.series_id ? " · semanal" : ""}
                           </p>
                         </div>
-                        {actions(a)}
+                        {badges(a)}
                       </li>
                     );
                   })}
@@ -900,6 +754,9 @@ export default function Agenda() {
         })}
       </div>
       )}
+
+      </div>
+      </div>
 
       <ChangeHistory table="appointments" rowId={history} open={!!history} onClose={() => setHistory(null)} title="Histórico da sessão" />
       <BlockDialog open={blocking} onClose={() => setBlocking(false)} pros={pros.data ?? []} defaultDate={baseDate} />
@@ -917,18 +774,17 @@ export default function Agenda() {
         defaultProfessional={pro}
       />
       <SessionDialog appointment={editing} open={!!editing} onClose={() => setEditing(null)} patients={patients.data ?? []} pros={pros.data ?? []} defaultDate={toDateStr(new Date())} />
-      <RecordDialog target={recording} patientName={recording ? (patientName.get(recording.patient_id) ?? "Paciente") : ""} onClose={() => setRecording(null)} />
-      <Dialog open={!!detailAppt} onOpenChange={(o) => !o && setDetail(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{detailAppt ? (patientName.get(detailAppt.patient_id) ?? "Paciente") : "Sessão"}</DialogTitle>
-            <DialogDescription>
-              {detailAppt ? `${dayLabel(dayKey(detailAppt.starts_at))} · ${hhmm(detailAppt.starts_at)}–${hhmm(detailAppt.ends_at)}` : ""}
-            </DialogDescription>
-          </DialogHeader>
-          {detailAppt && actions(detailAppt)}
-        </DialogContent>
-      </Dialog>
+      <SessionCard
+        appt={detailAppt}
+        patient={detailAppt ? patientById.get(detailAppt.patient_id) : undefined}
+        patientName={detailAppt ? (patientName.get(detailAppt.patient_id) ?? "Paciente") : ""}
+        proName={!isPsi && detailAppt ? proName.get(detailAppt.professional_id) : undefined}
+        busy={setStatus.isPending}
+        onClose={() => setDetail(null)}
+        onStatus={(a, status) => setStatus.mutate({ a, status })}
+        onReschedule={openEdit}
+        onHistory={(a) => openHistory(a.id)}
+      />
     </div>
   );
 }

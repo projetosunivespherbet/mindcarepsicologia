@@ -72,6 +72,7 @@ export interface Patient {
   id: string;
   nome: string;
   cpf: string | null;
+  cns: string | null;
   data_nascimento: string | null;
   telefone: string | null;
   email: string | null;
@@ -237,6 +238,9 @@ export interface Appointment {
   nota_status: FiscalStatus | null;
   /** true/false só para o profissional da sessão (psicólogo); nulo para quem não acessa o prontuário. */
   prontuario: boolean | null;
+  /** Nome de quem marcou a sessão. */
+  agendado_por: string | null;
+  created_at: string;
   imposto: boolean;
   series_id: string | null;
 }

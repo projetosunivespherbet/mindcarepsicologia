@@ -16,7 +16,7 @@ export interface SectionDef {
   label: string;
   hint: string;
   required: boolean;
-  /** Texto-base pré-preenchido; aceita {{paciente}}, {{psicologo}}, {{crp}}, {{clinica}}. */
+  /** Texto-base pré-preenchido; aceita {{paciente}}, {{identificacao}} (", portador do CPF X e do CNS Y,"), {{cpf}}, {{cns}}, {{quando}} (data e horário da sessão), {{psicologo}}, {{crp}}, {{clinica}}. */
   template?: string;
 }
 
@@ -50,7 +50,7 @@ export const DOCUMENT_TYPES: Record<DocumentTypeKey, DocumentTypeDef> = {
         hint: "Apenas o necessário para a finalidade informada.",
         required: true,
         template:
-          "Declaro, para os devidos fins, que {{paciente}} esteve em atendimento psicológico nesta data, no horário de [início] às [fim].",
+          "Declaro, para os devidos fins, que {{paciente}}{{identificacao}} esteve em atendimento psicológico {{quando}}.",
       },
     ],
   },
@@ -248,9 +248,42 @@ export interface DocumentData {
   annul_reason: string | null;
 }
 
-export function fillTemplate(text: string, ctx: { paciente: string; psicologo: string; crp: string; clinica: string }) {
+export const formatCpf = (d: string) => d.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
+export const formatCns = (d: string) => d.replace(/^(\d{3})(\d{4})(\d{4})(\d{4})$/, "$1 $2 $3 $4");
+
+export interface TemplateContext {
+  paciente: string;
+  psicologo: string;
+  crp: string;
+  clinica: string;
+  /** Só dígitos; omitidos se o paciente não tem o dado cadastrado. */
+  cpf?: string | null;
+  cns?: string | null;
+  /** Sessão a que o documento se refere (ISO). Sem ela, o texto pede para preencher data e horário. */
+  inicio?: string | null;
+  fim?: string | null;
+}
+
+/** ", portador do CPF X e do CNS Y," — só com o que está cadastrado; vazio se nada. */
+export function identificacaoPaciente(cpf?: string | null, cns?: string | null): string {
+  const partes = [cpf ? `do CPF ${formatCpf(cpf)}` : "", cns ? `do CNS ${formatCns(cns)}` : ""].filter(Boolean);
+  return partes.length ? `, portador ${partes.join(" e ")},` : "";
+}
+
+function quando(inicio?: string | null, fim?: string | null): string {
+  if (!inicio) return "nesta data, no horário de [início] às [fim]";
+  const hora = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const dia = new Date(inicio).toLocaleDateString("pt-BR");
+  return `no dia ${dia}, das ${hora(inicio)}${fim ? ` às ${hora(fim)}` : ""}`;
+}
+
+export function fillTemplate(text: string, ctx: TemplateContext) {
   return text
     .split("{{paciente}}").join(ctx.paciente)
+    .split("{{identificacao}}").join(identificacaoPaciente(ctx.cpf, ctx.cns))
+    .split("{{cpf}}").join(ctx.cpf ? formatCpf(ctx.cpf) : "[CPF]")
+    .split("{{cns}}").join(ctx.cns ? formatCns(ctx.cns) : "[CNS]")
+    .split("{{quando}}").join(quando(ctx.inicio, ctx.fim))
     .split("{{psicologo}}").join(ctx.psicologo)
     .split("{{crp}}").join(ctx.crp)
     .split("{{clinica}}").join(ctx.clinica);

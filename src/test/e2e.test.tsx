@@ -302,10 +302,16 @@ describe.skipIf(!process.env.E2E_PG)("fluxo completo: telas + API + Postgres", (
     expect(await screen.findByText("Agendado")).toBeInTheDocument();
     expect(screen.getByText(/00:10–01:00/)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Realizada" }));
-    expect(await screen.findByText("Realizado")).toBeInTheDocument();
-    expect(await screen.findByText("A receber")).toBeInTheDocument();
-    expect((await cobrancas()).find((c) => c.valor_centavos === 18000)).toMatchObject({ origem: "sessao", status: "aberta" });
+    // card da sessão: contato, quem marcou e a ação principal "Iniciar atendimento", que leva à ficha do paciente
+    await user.click(await screen.findByRole("button", { name: "Abrir" }));
+    expect(await screen.findByText(/Agendada em/)).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Iniciar atendimento" }));
+    await user.type(await screen.findByLabelText("Prontuário da sessão"), "Evolução da sessão.");
+    await user.type(screen.getByLabelText("Anotações privativas"), "Hipótese em observação.");
+    await user.click(screen.getByRole("button", { name: "Salvar e concluir atendimento" }));
+    await waitFor(async () => expect((await cobrancas()).find((c) => c.valor_centavos === 18000)).toMatchObject({ origem: "sessao", status: "aberta" }));
+    const feita = (await call("GET", `/patients/${seed.patient.id}/records`, { token: seed.anaToken })).json as Array<{ appointment_id: string; status: string; conteudo: string; anotacoes: string }>;
+    expect(feita.find((r) => r.status === "realizado")).toMatchObject({ conteudo: "Evolução da sessão.", anotacoes: "Hipótese em observação." });
     cleanup();
 
     // segunda sessão do dia, marcada como falta (não gera cobrança)
@@ -314,6 +320,8 @@ describe.skipIf(!process.env.E2E_PG)("fluxo completo: telas + API + Postgres", (
     const segunda = await call("POST", "/appointments", { token: seed.anaToken, body: { patient_id: seed.patient.id, starts_at: at16.toISOString(), ends_at: new Date(at16.getTime() + 50 * 60_000).toISOString(), valor: 180 } });
     expect(segunda.status, JSON.stringify(segunda.json)).toBe(201);
     await openApp("/agenda", seed.anaToken);
+    const abrir = await screen.findAllByRole("button", { name: "Abrir" }, { timeout: 5000 });
+    await user.click(abrir[1]!); // a primeira é a sessão já realizada; a segunda, das 02:00
     await user.click(await screen.findByRole("button", { name: "Faltou" }, { timeout: 5000 }));
     expect(await screen.findByText("Faltou", { selector: "span, div" })).toBeInTheDocument();
     expect((await cobrancas()).filter((c) => c.valor_centavos === 18000)).toHaveLength(1);
@@ -375,8 +383,11 @@ describe.skipIf(!process.env.E2E_PG)("fluxo completo: telas + API + Postgres", (
     await user.selectOptions(screen.getByLabelText("Tipo de atendimento"), "pro_bono");
     expect(screen.getByLabelText("Valor (R$)")).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Agendar" }));
-    expect(await screen.findByText("Pro bono", undefined, { timeout: 5000 })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Realizada" }));
+    const linha = (await screen.findByText("Pro bono", undefined, { timeout: 5000 })).closest("li")!;
+    await user.click(within(linha).getByRole("button", { name: "Abrir" }));
+    await user.click(await screen.findByRole("button", { name: "Iniciar atendimento" }));
+    await user.type(await screen.findByLabelText("Prontuário da sessão"), "Sessão pro bono.");
+    await user.click(screen.getByRole("button", { name: "Salvar e concluir atendimento" }));
 
     const hoje = new Date();
     const de = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
@@ -392,8 +403,9 @@ describe.skipIf(!process.env.E2E_PG)("fluxo completo: telas + API + Postgres", (
   it("administração vê o histórico de uma sessão e as pendências de emissão", async () => {
     const user = userEvent.setup();
     await openApp("/agenda", seed.adminToken);
-    const botoes = await screen.findAllByRole("button", { name: "Histórico" }, { timeout: 5000 });
-    await user.click(botoes[0]!);
+    const abrir = await screen.findAllByRole("button", { name: "Abrir" }, { timeout: 5000 });
+    await user.click(abrir[0]!);
+    await user.click(await screen.findByRole("button", { name: "Histórico" }));
     expect((await screen.findAllByText(/criou/, undefined, { timeout: 5000 })).length).toBeGreaterThan(0);
     cleanup();
 

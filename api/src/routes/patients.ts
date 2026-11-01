@@ -4,13 +4,14 @@ import { z } from "zod";
 import { audit, withSession, type DbClient } from "../db";
 import { requireAuth } from "../middleware";
 import type { AppEnv } from "../types";
-import { cpfSchema, emailSchema, nameSchema, optText, readBody, readQuery } from "../validation";
+import { cnsSchema, cpfSchema, emailSchema, nameSchema, optText, readBody, readQuery } from "../validation";
 
-const COLS = "id, nome, cpf, data_nascimento::text AS data_nascimento, telefone, email, genero, estado_civil, profissao, professional_id, ativo, created_at, updated_at";
+const COLS = "id, nome, cpf, cns, data_nascimento::text AS data_nascimento, telefone, email, genero, estado_civil, profissao, professional_id, ativo, created_at, updated_at";
 
 const patientFields = {
   nome: nameSchema,
   cpf: cpfSchema.optional().nullable(),
+  cns: cnsSchema.optional().nullable(),
   data_nascimento: z.iso.date().optional().nullable(),
   telefone: optText(30),
   email: emailSchema.optional().nullable(),
@@ -53,10 +54,10 @@ patients.post("/", async (c) => {
   const row = await withSession(c.get("pool"), s, async (db) => {
     await assertProfessional(db, professionalId);
     const r = await db.query(
-      `INSERT INTO patients (clinic_id, nome, cpf, data_nascimento, telefone, email, genero, estado_civil, profissao, professional_id, created_by)
-       VALUES ($1, $2, $11, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING ${COLS}`,
+      `INSERT INTO patients (clinic_id, nome, cpf, cns, data_nascimento, telefone, email, genero, estado_civil, profissao, professional_id, created_by)
+       VALUES ($1, $2, $11, $12, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING ${COLS}`,
       [s.clinicId, body.nome, body.data_nascimento ?? null, body.telefone ?? null, body.email ?? null,
-       body.genero ?? null, body.estado_civil ?? null, body.profissao ?? null, professionalId, s.userId, body.cpf ?? null],
+       body.genero ?? null, body.estado_civil ?? null, body.profissao ?? null, professionalId, s.userId, body.cpf ?? null, body.cns ?? null],
     );
     await audit(db, s, "patient.create", "patient", r.rows[0].id);
     return r.rows[0];
@@ -82,6 +83,28 @@ patients.get("/:id", async (c) => {
   });
   if (!result) throw new HTTPException(404, { message: "Paciente não encontrado" });
   return c.json(result);
+});
+
+// Histórico clínico do paciente com este profissional: cada sessão já iniciada, com prontuário e anotações privativas.
+// Só o psicólogo (ou o administrador que atende) lê; a RLS ainda limita ao que é dele.
+patients.get("/:id/records", async (c) => {
+  const s = c.get("session");
+  if (!(s.role === "psicologo" || (s.role === "admin" && s.atende))) {
+    throw new HTTPException(403, { message: "Apenas o psicólogo responsável acessa o prontuário" });
+  }
+  const rows = await withSession(c.get("pool"), s, async (db) => {
+    const r = await db.query(
+      `SELECT a.id AS appointment_id, a.patient_id, a.starts_at, a.ends_at, a.status, a.atendimento,
+              COALESCE(r.conteudo, '') AS conteudo, COALESCE(r.anotacoes, '') AS anotacoes, r.updated_at
+       FROM appointments a LEFT JOIN session_records r ON r.appointment_id = a.id
+       WHERE a.patient_id = $1 AND a.professional_id = app_user() AND a.status <> 'cancelado' AND a.starts_at <= now()
+       ORDER BY a.starts_at DESC LIMIT 200`,
+      [c.req.param("id")],
+    );
+    await audit(db, s, "session_record.list", "patient", c.req.param("id"));
+    return r.rows;
+  });
+  return c.json(rows);
 });
 
 patients.patch("/:id", async (c) => {

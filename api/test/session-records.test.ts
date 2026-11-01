@@ -119,4 +119,65 @@ describe("prontuário da sessão", () => {
     expect(r.rows.map((x) => x.action)).toEqual(["session_record.save", "session_record.read"]);
     await expect(appPool.query("DELETE FROM session_records")).rejects.toThrow();
   });
+
+  it("anotações privativas ficam separadas do prontuário e salvar um não apaga o outro", async () => {
+    const s = await cenario();
+    const id = await s.sessao(0, "realizado");
+    const put = (body: unknown, token = s.psiA.token) => call("PUT", `/appointments/${id}/record`, { token, body });
+
+    // só anotações: a sessão continua sem prontuário preenchido
+    const so = await put({ anotacoes: "  Hipótese: ansiedade social.  " });
+    expect(so.status).toBe(200);
+    expect(so.json).toMatchObject({ conteudo: "", anotacoes: "Hipótese: ansiedade social." });
+    expect((await s.lista(s.psiA.token)).find((a) => a.id === id)?.prontuario).toBe(false);
+
+    // o prontuário entra sem sobrescrever as anotações
+    await put({ conteudo: "Evolução favorável." });
+    const lido = (await call("GET", `/appointments/${id}/record`, { token: s.psiA.token })).json;
+    expect(lido).toMatchObject({ conteudo: "Evolução favorável.", anotacoes: "Hipótese: ansiedade social." });
+    expect((await s.lista(s.psiA.token)).find((a) => a.id === id)?.prontuario).toBe(true);
+
+    // e as anotações podem ser reescritas sem tocar o prontuário
+    await put({ anotacoes: "Nova impressão." });
+    expect((await call("GET", `/appointments/${id}/record`, { token: s.psiA.token })).json).toMatchObject({ conteudo: "Evolução favorável.", anotacoes: "Nova impressão." });
+
+    // ninguém além do psicólogo da sessão grava anotações
+    expect((await put({ anotacoes: "Invasão" }, s.rec.token)).status).toBe(403);
+    expect((await put({ anotacoes: "Invasão" }, s.psiB.token)).status).toBe(404);
+    expect((await put({ anotacoes: "x".repeat(20001) })).status).toBe(400);
+  });
+
+  it("histórico do paciente: lista as sessões já iniciadas com o registro, só para o psicólogo da sessão", async () => {
+    const s = await cenario();
+    await s.sessao(0, "realizado"); // 2030: ainda no futuro, não entra no histórico
+    const passada = async (dias: number, status: string) =>
+      (
+        await ownerPool.query(
+          `INSERT INTO appointments (clinic_id, patient_id, professional_id, starts_at, ends_at, status, valor, created_by)
+           VALUES ($1, $2, $3, now() - $4::int * interval '1 day', now() - $4::int * interval '1 day' + interval '50 minutes', $5, 200, $3) RETURNING id`,
+          [s.c.clinicId, s.pac.id, s.psiA.id, dias, status],
+        )
+      ).rows[0].id as string;
+    const velha = await passada(7, "realizado");
+    const recente = await passada(2, "faltou");
+    await passada(1, "cancelado"); // cancelada não entra
+    await call("PUT", `/appointments/${velha}/record`, { token: s.psiA.token, body: { conteudo: "Primeira sessão.", anotacoes: "Nota A." } });
+
+    const r = await call("GET", `/patients/${s.pac.id}/records`, { token: s.psiA.token });
+    expect(r.status).toBe(200);
+    expect(r.json.map((x: { appointment_id: string }) => x.appointment_id)).toEqual([recente, velha]); // mais recente primeiro
+    expect(r.json[0]).toMatchObject({ status: "faltou", conteudo: "", anotacoes: "" });
+    expect(r.json[1]).toMatchObject({ status: "realizado", conteudo: "Primeira sessão.", anotacoes: "Nota A." });
+
+    for (const token of [s.rec.token, s.c.adminToken]) expect((await call("GET", `/patients/${s.pac.id}/records`, { token })).status).toBe(403);
+    expect((await call("GET", `/patients/${s.pac.id}/records`, { token: s.psiB.token })).json).toEqual([]);
+  });
+
+  it("a lista da agenda informa quem marcou a sessão", async () => {
+    const s = await cenario();
+    const id = await s.sessao(0);
+    const item = (await call("GET", `/appointments?from=${encodeURIComponent(at(0, "00:00"))}&to=${encodeURIComponent(at(7, "00:00"))}`, { token: s.rec.token })).json.find((a: { id: string }) => a.id === id);
+    expect(item.agendado_por).toBe("Dra. Ana Lima");
+    expect(item.created_at).toBeTruthy();
+  });
 });

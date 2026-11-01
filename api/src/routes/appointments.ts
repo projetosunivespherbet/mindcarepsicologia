@@ -41,7 +41,9 @@ const appointmentFields = {
 };
 
 // Prontuário da sessão: true/false só para o profissional da sessão; nulo para os demais (não enxergam o prontuário).
-const PRONTUARIO = `(CASE WHEN professional_id = app_user() THEN EXISTS (SELECT 1 FROM session_records r WHERE r.appointment_id = appointments.id) END) AS prontuario`;
+const PRONTUARIO = `(CASE WHEN professional_id = app_user() THEN EXISTS (SELECT 1 FROM session_records r WHERE r.appointment_id = appointments.id AND r.conteudo <> '') END) AS prontuario`;
+// Quem marcou a sessão (nome), para o card da agenda.
+const AGENDADO_POR = `(SELECT u.nome FROM users u WHERE u.id = appointments.created_by) AS agendado_por`;
 
 /** Só o psicólogo (ou o administrador que atende) escreve e lê prontuários. */
 const author = createMiddleware<AppEnv>(async (c, next) => {
@@ -63,7 +65,7 @@ appointments.get("/pending-records", author, async (c) => {
         `SELECT a.id, a.patient_id, a.starts_at, a.ends_at FROM appointments a
          WHERE a.professional_id = app_user() AND a.status = 'realizado'
            AND a.starts_at <= now() AND a.starts_at > now() - interval '180 days'
-           AND NOT EXISTS (SELECT 1 FROM session_records r WHERE r.appointment_id = a.id)
+           AND NOT EXISTS (SELECT 1 FROM session_records r WHERE r.appointment_id = a.id AND r.conteudo <> '')
          ORDER BY a.starts_at DESC LIMIT 100`,
       )
     ).rows,
@@ -75,25 +77,36 @@ appointments.get("/:id/record", author, async (c) => {
   const s = c.get("session");
   const row = await withSession(c.get("pool"), s, async (db) => {
     const r = (
-      await db.query("SELECT appointment_id, conteudo, updated_at FROM session_records WHERE appointment_id = $1", [c.req.param("id")])
+      await db.query("SELECT appointment_id, conteudo, anotacoes, updated_at FROM session_records WHERE appointment_id = $1", [c.req.param("id")])
     ).rows[0];
     if (r) await audit(db, s, "session_record.read", "session_record", r.appointment_id);
     return r;
   });
-  return c.json(row ?? { appointment_id: c.req.param("id"), conteudo: null, updated_at: null });
+  return c.json(row ?? { appointment_id: c.req.param("id"), conteudo: null, anotacoes: null, updated_at: null });
 });
 
 appointments.put("/:id/record", author, async (c) => {
   const s = c.get("session");
-  const body = await readBody(c, z.object({ conteudo: z.string().trim().min(1, "Escreva o registro da sessão").max(20000, "Texto muito longo (máximo 20.000 caracteres)") }));
+  const body = await readBody(
+    c,
+    z.object({
+      conteudo: z.string().trim().min(1, "Escreva o registro da sessão").max(20000, "Texto muito longo (máximo 20.000 caracteres)").optional(),
+      anotacoes: z.string().trim().max(20000, "Anotações muito longas (máximo 20.000 caracteres)").optional(),
+    }),
+  );
+  if (body.conteudo === undefined && body.anotacoes === undefined) throw new HTTPException(400, { message: "Escreva o registro da sessão" });
   const row = await withSession(c.get("pool"), s, async (db) => {
+    // Só o que veio no corpo é alterado: salvar o prontuário não apaga as anotações privativas, e vice-versa.
     const r = await db.query(
-      `INSERT INTO session_records (appointment_id, clinic_id, patient_id, professional_id, conteudo, created_by, updated_by)
-       SELECT a.id, a.clinic_id, a.patient_id, a.professional_id, $2, app_user(), app_user()
+      `INSERT INTO session_records (appointment_id, clinic_id, patient_id, professional_id, conteudo, anotacoes, created_by, updated_by)
+       SELECT a.id, a.clinic_id, a.patient_id, a.professional_id, COALESCE($2::text, ''), COALESCE($3::text, ''), app_user(), app_user()
        FROM appointments a WHERE a.id = $1 AND a.professional_id = app_user() AND a.status <> 'cancelado'
-       ON CONFLICT (appointment_id) DO UPDATE SET conteudo = EXCLUDED.conteudo, updated_by = app_user()
-       RETURNING appointment_id, conteudo, updated_at`,
-      [c.req.param("id"), body.conteudo],
+       ON CONFLICT (appointment_id) DO UPDATE SET
+         conteudo = COALESCE($2::text, session_records.conteudo),
+         anotacoes = COALESCE($3::text, session_records.anotacoes),
+         updated_by = app_user()
+       RETURNING appointment_id, conteudo, anotacoes, updated_at`,
+      [c.req.param("id"), body.conteudo ?? null, body.anotacoes ?? null],
     );
     if (r.rows[0]) await audit(db, s, "session_record.save", "session_record", r.rows[0].appointment_id);
     return r.rows[0];
@@ -108,7 +121,7 @@ appointments.get("/", async (c) => {
   const rows = await withSession(c.get("pool"), c.get("session"), async (db) =>
     (
       await db.query(
-        `SELECT ${COLS}, ${NOTA_STATUS}, ${PRONTUARIO} FROM appointments
+        `SELECT ${COLS}, ${NOTA_STATUS}, ${PRONTUARIO}, ${AGENDADO_POR} FROM appointments
          WHERE starts_at >= $1 AND starts_at < $2
            AND ($3::uuid IS NULL OR professional_id = $3) AND ($4::uuid IS NULL OR patient_id = $4)
          ORDER BY starts_at`,

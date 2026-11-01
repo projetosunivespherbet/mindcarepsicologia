@@ -94,14 +94,26 @@ export function DocumentNew() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [patientId, setPatientId] = useState(params.get("paciente") ?? "");
-  const [tipo, setTipo] = useState<DocumentTypeKey | "">("");
+  const [tipo, setTipo] = useState<DocumentTypeKey | "">(() => {
+    const t = params.get("tipo");
+    return t && t in DOCUMENT_TYPES ? (t as DocumentTypeKey) : "";
+  });
   const patients = useQuery({ queryKey: ["patients", ""], queryFn: () => api<Patient[]>("/patients") });
 
   const create = useMutation({
     mutationFn: () => {
       const def = DOCUMENT_TYPES[tipo as DocumentTypeKey];
       const patient = patients.data!.find((p) => p.id === patientId)!;
-      const ctx = { paciente: patient.nome, psicologo: user!.nome, crp: user!.crp ?? "", clinica: user!.clinic_nome };
+      const ctx = {
+        paciente: patient.nome,
+        psicologo: user!.nome,
+        crp: user!.crp ?? "",
+        clinica: user!.clinic_nome,
+        cpf: patient.cpf,
+        cns: patient.cns,
+        inicio: params.get("inicio"),
+        fim: params.get("fim"),
+      };
       const conteudo = Object.fromEntries(def.sections.filter((s) => s.template).map((s) => [s.key, fillTemplate(s.template!, ctx)]));
       return api<DocFull>("/documents", { body: { patient_id: patientId, tipo, conteudo } });
     },

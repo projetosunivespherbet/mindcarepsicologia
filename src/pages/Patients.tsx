@@ -42,7 +42,7 @@ export default function Patients() {
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ nome: "", data_nascimento: "", telefone: "", email: "", professional_id: "" });
+  const [form, setForm] = useState({ nome: "", cpf: "", cns: "", data_nascimento: "", telefone: "", email: "", professional_id: "" });
   const list = useQuery({ queryKey: ["patients", q], queryFn: () => api<Patient[]>(`/patients?q=${encodeURIComponent(q)}`) });
 
   const create = useMutation({
@@ -50,6 +50,8 @@ export default function Patients() {
       api<Patient>("/patients", {
         body: {
           nome: form.nome,
+          cpf: form.cpf.trim() || null,
+          cns: form.cns.trim() || null,
           data_nascimento: form.data_nascimento || null,
           telefone: form.telefone || null,
           email: form.email || null,
@@ -134,6 +136,16 @@ export default function Patients() {
             <div className="space-y-2">
               <Label htmlFor="p-nome">Nome completo</Label>
               <Input id="p-nome" required minLength={2} value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="p-cpf">CPF</Label>
+                <Input id="p-cpf" inputMode="numeric" placeholder="000.000.000-00" value={form.cpf} onChange={(e) => setForm({ ...form, cpf: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="p-cns">CNS</Label>
+                <Input id="p-cns" inputMode="numeric" placeholder="000 0000 0000 0000" value={form.cns} onChange={(e) => setForm({ ...form, cns: e.target.value })} />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">

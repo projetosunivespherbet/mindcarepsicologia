@@ -67,6 +67,39 @@ export const cpfCnpjSchema = z
   .transform(onlyDocChars)
   .refine((d) => isValidCpf(d) || isValidCnpj(d), "CPF ou CNPJ inválido");
 
+/** CNS (Cartão Nacional de Saúde): 15 dígitos; definitivo começa com 1 ou 2, provisório com 7, 8 ou 9. */
+export function isValidCns(digits: string): boolean {
+  if (!/^\d{15}$/.test(digits)) return false;
+  const d = [...digits].map(Number);
+  if (digits[0] === "1" || digits[0] === "2") {
+    let soma = 0;
+    for (let i = 0; i < 11; i++) soma += d[i]! * (15 - i);
+    const resto = soma % 11;
+    let dv = resto === 0 ? 0 : 11 - resto;
+    let sufixo = "000";
+    if (dv === 10) {
+      soma += 2;
+      dv = 11 - (soma % 11);
+      sufixo = "001";
+    }
+    return digits === `${digits.slice(0, 11)}${sufixo}${dv}`;
+  }
+  if (["7", "8", "9"].includes(digits[0]!)) {
+    let soma = 0;
+    for (let i = 0; i < 15; i++) soma += d[i]! * (15 - i);
+    return soma % 11 === 0;
+  }
+  return false;
+}
+
+/** CNS com ou sem espaços; guarda os 15 dígitos. */
+export const cnsSchema = z
+  .string()
+  .trim()
+  .max(25)
+  .transform((s) => s.replace(/[\s.\-]/g, ""))
+  .refine(isValidCns, "CNS inválido");
+
 /** Só CPF (com ou sem máscara); guarda os 11 dígitos. */
 export const cpfSchema = z
   .string()
