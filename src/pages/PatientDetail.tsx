@@ -7,7 +7,7 @@ import { DocStatusBadge } from "@/components/DocStatusBadge";
 import { PatientCharges } from "@/components/PatientCharges";
 import { PatientPackages } from "@/components/PatientPackages";
 import { PatientRecords } from "@/components/PatientRecords";
-import { AddressInput } from "@/components/AddressInput";
+import { AddressInput, montarEndereco, type Endereco } from "@/components/AddressInput";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,7 +38,13 @@ export function DataForm({ patient }: { patient?: PatientDetailType }) {
     nome: patient?.nome ?? "",
     cpf: patient?.cpf ?? "",
     cns: patient?.cns ?? "",
-    endereco: patient?.endereco ?? "",
+    end_cep: patient?.end_cep ?? "",
+    end_logradouro: patient?.end_logradouro ?? "",
+    end_numero: patient?.end_numero ?? "",
+    end_complemento: patient?.end_complemento ?? "",
+    end_bairro: patient?.end_bairro ?? "",
+    end_cidade: patient?.end_cidade ?? "",
+    end_uf: patient?.end_uf ?? "",
     responsavel_nome: patient?.responsavel_nome ?? "",
     responsavel_cpf: patient?.responsavel_cpf ?? "",
     responsavel_vinculo: patient?.responsavel_vinculo ?? "",
@@ -52,6 +58,20 @@ export function DataForm({ patient }: { patient?: PatientDetailType }) {
     professional_id: patient?.professional_id ?? "",
     ativo: patient?.ativo ?? true,
   });
+  const partes: Endereco = {
+    end_cep: f.end_cep, end_logradouro: f.end_logradouro, end_numero: f.end_numero, end_complemento: f.end_complemento,
+    end_bairro: f.end_bairro, end_cidade: f.end_cidade, end_uf: f.end_uf,
+  };
+  const textoEndereco = montarEndereco(partes);
+  // Endereço antigo (texto livre, sem partes): fica como está até alguém preencher os campos.
+  const antigo = !textoEndereco && patient?.endereco ? patient.endereco : null;
+  const enderecoBody = () =>
+    antigo
+      ? {}
+      : {
+          endereco: textoEndereco || null,
+          ...Object.fromEntries(Object.entries(partes).map(([k, v]) => [k, v.trim() || null])),
+        };
   const save = useMutation({
     mutationFn: () =>
       api<PatientDetailType>(patient ? `/patients/${patient.id}` : "/patients", {
@@ -60,7 +80,7 @@ export function DataForm({ patient }: { patient?: PatientDetailType }) {
           nome: f.nome,
           cpf: f.cpf.trim() || null,
           cns: f.cns.trim() || null,
-          endereco: f.endereco.trim() || null,
+          ...enderecoBody(),
           responsavel_nome: f.responsavel_nome.trim() || null,
           responsavel_cpf: f.responsavel_cpf.trim() || null,
           responsavel_vinculo: f.responsavel_vinculo.trim() || null,
@@ -114,7 +134,8 @@ export function DataForm({ patient }: { patient?: PatientDetailType }) {
       </div>
       <h3 className="pt-2 text-sm font-semibold text-muted-foreground sm:col-span-2">Endereço e contato</h3>
       <div className="space-y-2 sm:col-span-2">
-        <AddressInput id="d-end" value={f.endereco} onChange={(v) => setF({ ...f, endereco: v })} />
+        {antigo && <p className="text-xs text-muted-foreground">Endereço cadastrado antes: {antigo}. Preencha os campos abaixo para atualizá-lo.</p>}
+        <AddressInput id="d-end" value={partes} onChange={(v) => setF({ ...f, ...v })} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="d-tel">Telefone</Label>

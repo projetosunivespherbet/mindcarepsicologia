@@ -6,13 +6,20 @@ import { requireAuth } from "../middleware";
 import type { AppEnv } from "../types";
 import { cnsSchema, cpfSchema, emailSchema, nameSchema, optText, readBody, readQuery } from "../validation";
 
-const COLS = "id, nome, cpf, cns, endereco, responsavel_nome, responsavel_cpf, responsavel_vinculo, responsavel_telefone, data_nascimento::text AS data_nascimento, telefone, email, genero, estado_civil, profissao, professional_id, ativo, created_at, updated_at";
+const COLS = "id, nome, cpf, cns, endereco, end_cep, end_logradouro, end_numero, end_complemento, end_bairro, end_cidade, end_uf, responsavel_nome, responsavel_cpf, responsavel_vinculo, responsavel_telefone, data_nascimento::text AS data_nascimento, telefone, email, genero, estado_civil, profissao, professional_id, ativo, created_at, updated_at";
 
 const patientFields = {
   nome: nameSchema,
   cpf: cpfSchema.optional().nullable(),
   cns: cnsSchema.optional().nullable(),
   endereco: optText(300),
+  end_cep: z.string().trim().transform((s) => s.replace(/\D/g, "")).pipe(z.string().regex(/^\d{8}$/, "CEP inválido")).optional().nullable(),
+  end_logradouro: optText(160),
+  end_numero: optText(20),
+  end_complemento: optText(80),
+  end_bairro: optText(80),
+  end_cidade: optText(80),
+  end_uf: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/, "UF inválida").optional().nullable(),
   responsavel_nome: z.string().trim().min(2, "Nome do responsável muito curto").max(160).optional().nullable(),
   responsavel_cpf: cpfSchema.optional().nullable(),
   responsavel_vinculo: optText(60),
@@ -59,11 +66,12 @@ patients.post("/", async (c) => {
   const row = await withSession(c.get("pool"), s, async (db) => {
     await assertProfessional(db, professionalId);
     const r = await db.query(
-      `INSERT INTO patients (clinic_id, nome, cpf, cns, endereco, responsavel_nome, responsavel_cpf, responsavel_vinculo, responsavel_telefone, data_nascimento, telefone, email, genero, estado_civil, profissao, professional_id, created_by)
-       VALUES ($1, $2, $11, $12, $13, $14, $15, $16, $17, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING ${COLS}`,
+      `INSERT INTO patients (clinic_id, nome, cpf, cns, endereco, end_cep, end_logradouro, end_numero, end_complemento, end_bairro, end_cidade, end_uf, responsavel_nome, responsavel_cpf, responsavel_vinculo, responsavel_telefone, data_nascimento, telefone, email, genero, estado_civil, profissao, professional_id, created_by)
+       VALUES ($1, $2, $11, $12, $13, $18, $19, $20, $21, $22, $23, $24, $14, $15, $16, $17, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING ${COLS}`,
       [s.clinicId, body.nome, body.data_nascimento ?? null, body.telefone ?? null, body.email ?? null,
        body.genero ?? null, body.estado_civil ?? null, body.profissao ?? null, professionalId, s.userId, body.cpf ?? null, body.cns ?? null, body.endereco || null,
-       body.responsavel_nome || null, body.responsavel_cpf ?? null, body.responsavel_vinculo || null, body.responsavel_telefone || null],
+       body.responsavel_nome || null, body.responsavel_cpf ?? null, body.responsavel_vinculo || null, body.responsavel_telefone || null,
+       body.end_cep || null, body.end_logradouro || null, body.end_numero || null, body.end_complemento || null, body.end_bairro || null, body.end_cidade || null, body.end_uf || null],
     );
     await audit(db, s, "patient.create", "patient", r.rows[0].id);
     return r.rows[0];

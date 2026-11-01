@@ -30,6 +30,13 @@ describe("CNS (Cartão Nacional de Saúde)", () => {
     const rl = await call("PATCH", `/patients/${novo.json.id}`, { token: psi.token, body: { responsavel_nome: "Ana Souza", responsavel_cpf: "111.444.777-35", responsavel_vinculo: "mãe", responsavel_telefone: "11999990000" } });
     expect(rl.json).toMatchObject({ responsavel_nome: "Ana Souza", responsavel_cpf: "11144477735", responsavel_vinculo: "mãe" });
     expect((await call("PATCH", `/patients/${novo.json.id}`, { token: psi.token, body: { responsavel_cpf: "123" } })).status).toBe(400);
+    const partes = await call("PATCH", `/patients/${novo.json.id}`, {
+      token: psi.token,
+      body: { end_cep: "01001-000", end_logradouro: "Praça da Sé", end_numero: "10", end_bairro: "Sé", end_cidade: "São Paulo", end_uf: "sp", endereco: "Praça da Sé, 10, Sé, São Paulo/SP, CEP 01001-000" },
+    });
+    expect(partes.json).toMatchObject({ end_cep: "01001000", end_uf: "SP", end_numero: "10", endereco: "Praça da Sé, 10, Sé, São Paulo/SP, CEP 01001-000" });
+    expect((await call("PATCH", `/patients/${novo.json.id}`, { token: psi.token, body: { end_uf: "SPX" } })).status).toBe(400);
+    expect((await call("PATCH", `/patients/${novo.json.id}`, { token: psi.token, body: { end_cep: "123" } })).status).toBe(400);
     const limpo = await call("PATCH", `/patients/${novo.json.id}`, { token: psi.token, body: { cns: null } });
     expect(limpo.json.cns).toBeNull();
   });

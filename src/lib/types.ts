@@ -74,6 +74,13 @@ export interface Patient {
   cpf: string | null;
   cns: string | null;
   endereco: string | null;
+  end_cep: string | null;
+  end_logradouro: string | null;
+  end_numero: string | null;
+  end_complemento: string | null;
+  end_bairro: string | null;
+  end_cidade: string | null;
+  end_uf: string | null;
   responsavel_nome: string | null;
   responsavel_cpf: string | null;
   responsavel_vinculo: string | null;

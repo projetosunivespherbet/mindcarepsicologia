@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { enderecoDoCep } from "@/components/AddressInput";
+import { ENDERECO_VAZIO, montarEndereco, partesDoViaCep } from "@/components/AddressInput";
 
-describe("endereço pelo CEP", () => {
-  it("monta rua, bairro, cidade/UF e CEP, deixando o número para completar", () => {
-    expect(enderecoDoCep("01001000", { logradouro: "Praça da Sé", bairro: "Sé", localidade: "São Paulo", uf: "SP" })).toBe("Praça da Sé, nº , Sé, São Paulo/SP, CEP 01001-000");
+describe("endereço em partes", () => {
+  it("o CEP preenche rua, bairro, cidade e UF, mantendo número e complemento", () => {
+    const atual = { ...ENDERECO_VAZIO, end_numero: "10", end_complemento: "apto 2" };
+    expect(partesDoViaCep({ cep: "01001-000", logradouro: "Praça da Sé", bairro: "Sé", localidade: "São Paulo", uf: "SP" }, atual)).toEqual({
+      end_cep: "01001000", end_logradouro: "Praça da Sé", end_numero: "10", end_complemento: "apto 2", end_bairro: "Sé", end_cidade: "São Paulo", end_uf: "SP",
+    });
   });
-  it("CEP de cidade sem logradouro traz só cidade/UF e CEP", () => {
-    expect(enderecoDoCep("07750000", { logradouro: "", bairro: "", localidade: "Cajamar", uf: "SP" })).toBe("Cajamar/SP, CEP 07750-000");
+  it("monta o texto do endereço para os documentos", () => {
+    expect(montarEndereco({ end_cep: "01001000", end_logradouro: "Praça da Sé", end_numero: "10", end_complemento: "apto 2", end_bairro: "Sé", end_cidade: "São Paulo", end_uf: "SP" })).toBe(
+      "Praça da Sé, 10, apto 2, Sé, São Paulo/SP, CEP 01001-000",
+    );
+    expect(montarEndereco({ ...ENDERECO_VAZIO, end_cidade: "Cajamar", end_uf: "SP" })).toBe("Cajamar/SP");
+    expect(montarEndereco(ENDERECO_VAZIO)).toBe("");
   });
 });
