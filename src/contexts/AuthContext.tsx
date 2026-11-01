@@ -8,8 +8,8 @@ interface AuthState {
   loading: boolean;
   /** psicólogo, ou administrador que também atende */
   canProduceDocuments: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  acceptInvite: (token: string, password: string, email?: string) => Promise<void>;
+  login: (email: string, password: string, turnstile?: string) => Promise<void>;
+  acceptInvite: (token: string, password: string, email?: string, turnstile?: string) => Promise<void>;
   logout: () => void;
   /** recarrega o perfil (por exemplo, depois de renomear a clínica) */
   refresh: () => Promise<void>;
@@ -44,8 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [loadMe, queryClient]);
 
   const login = useCallback(
-    async (email: string, password: string) => {
-      const r = await api<{ token: string }>("/auth/login", { auth: false, body: { email, password } });
+    async (email: string, password: string, turnstile?: string) => {
+      const r = await api<{ token: string }>("/auth/login", { auth: false, body: { email, password, turnstile } });
       tokenStore.set(r.token);
       await loadMe();
     },
@@ -53,8 +53,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const acceptInvite = useCallback(
-    async (token: string, password: string, email?: string) => {
-      const r = await api<{ token: string }>("/invites/accept", { auth: false, body: { token, password, email } });
+    async (token: string, password: string, email?: string, turnstile?: string) => {
+      const r = await api<{ token: string }>("/invites/accept", { auth: false, body: { token, password, email, turnstile } });
       tokenStore.set(r.token);
       await loadMe();
     },

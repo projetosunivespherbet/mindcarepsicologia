@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Brain } from "lucide-react";
 import { toast } from "sonner";
+import { Turnstile, turnstileEnabled } from "@/components/Turnstile";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,8 @@ export default function Invite() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaKey, setCaptchaKey] = useState(0);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -42,11 +45,12 @@ export default function Invite() {
     setBusy(true);
     try {
       const isInvite = info.data?.kind === "convite";
-      await acceptInvite(token, password, isInvite ? (email.trim() || info.data?.email || undefined) : undefined);
+      await acceptInvite(token, password, isInvite ? (email.trim() || info.data?.email || undefined) : undefined, captcha ?? undefined);
       toast.success(isInvite ? "Cadastro concluído" : "Senha redefinida");
       navigate("/");
     } catch (err) {
       toast.error(errMsg(err, "Não foi possível concluir"));
+      setCaptchaKey((k) => k + 1);
     } finally {
       setBusy(false);
     }
@@ -100,7 +104,8 @@ export default function Invite() {
                     <Label htmlFor="confirma">Confirmar senha</Label>
                     <Input id="confirma" type="password" autoComplete="new-password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
                   </div>
-                  <Button type="submit" className="w-full" disabled={busy}>
+                  <Turnstile onToken={setCaptcha} resetKey={captchaKey} />
+                  <Button type="submit" className="w-full" disabled={busy || (turnstileEnabled && !captcha)}>
                     {busy ? "Salvando..." : data.kind === "convite" ? "Concluir cadastro" : "Salvar nova senha"}
                   </Button>
                 </form>

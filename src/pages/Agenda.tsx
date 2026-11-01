@@ -15,6 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ApiError, api, errMsg } from "@/lib/api";
 import { addDays, addMinutes, dayKey, dayLabel, hhmm, localInstant, minutesBetween, timeInput, toDateStr, weekStart } from "@/lib/dates";
 import { brl, centsToInput, parseBRL } from "@/lib/money";
+import { downloadIcs, icsContent, reminderText, whatsappNumber, whatsappUrl } from "@/lib/reminder";
 import { ChangeHistory } from "@/components/ChangeHistory";
 import type { Appointment, AppointmentStatus, Atendimento, Patient, Professional, TimeBlock } from "@/lib/types";
 
@@ -625,6 +626,7 @@ export default function Agenda() {
   const pros = useQuery({ queryKey: ["professionals"], queryFn: () => api<Professional[]>("/professionals") });
 
   const patientName = useMemo(() => new Map((patients.data ?? []).map((p) => [p.id, p.nome])), [patients.data]);
+  const patientPhone = useMemo(() => new Map((patients.data ?? []).map((p) => [p.id, p.telefone])), [patients.data]);
   const proName = useMemo(() => new Map((pros.data ?? []).map((p) => [p.id, p.nome])), [pros.data]);
 
   const days = Array.from({ length: 7 }, (_, i) => toDateStr(addDays(anchor, i)));
@@ -715,6 +717,28 @@ export default function Agenda() {
                               Remarcar
                             </Button>
                           )}
+                          {open && (
+                            <>
+                              {whatsappNumber(patientPhone.get(a.patient_id)) && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    window.open(
+                                      whatsappUrl(whatsappNumber(patientPhone.get(a.patient_id))!, reminderText({ paciente: patientName.get(a.patient_id) ?? "", clinica: user?.clinic_nome ?? "", starts_at: a.starts_at, ends_at: a.ends_at })),
+                                      "_blank",
+                                      "noopener",
+                                    )
+                                  }
+                                >
+                                  Lembrete (WhatsApp)
+                                </Button>
+                              )}
+                              <Button size="sm" variant="ghost" onClick={() => downloadIcs(`sessao-${dayKey(a.starts_at)}.ics`, icsContent({ id: a.id, clinica: user?.clinic_nome ?? "", starts_at: a.starts_at, ends_at: a.ends_at }))}>
+                                Arquivo de agenda
+                              </Button>
+                            </>
+                          )}
                           {a.prontuario !== null && (a.status === "realizado" || a.status === "faltou") && (
                             <Button size="sm" variant={a.prontuario ? "ghost" : "outline"} onClick={() => openRecord(a)}>
                               {a.prontuario ? "Abrir prontuário" : "Preencher prontuário"}
@@ -759,6 +783,14 @@ export default function Agenda() {
         <span className="text-sm font-medium" aria-live="polite">
           {rangeLabel}
         </span>
+        <Input
+          type="date"
+          aria-label="Ir para a data"
+          title="Ir para a semana de uma data"
+          className="w-auto"
+          value={toDateStr(anchor)}
+          onChange={(e) => e.target.value && setAnchor(weekStart(new Date(`${e.target.value}T12:00:00`)))}
+        />
         <div className="flex gap-1 ml-auto" role="group" aria-label="Modo de visualização">
           <Button size="sm" variant={view === "grade" ? "default" : "outline"} aria-pressed={view === "grade"} onClick={() => changeView("grade")}>
             <CalendarDays className="w-4 h-4 mr-1" /> Grade

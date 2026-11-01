@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Turnstile, turnstileEnabled } from "@/components/Turnstile";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import { errMsg } from "@/lib/api";
@@ -15,15 +16,18 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaKey, setCaptchaKey] = useState(0);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
     try {
-      await login(email.trim(), password);
+      await login(email.trim(), password, captcha ?? undefined);
       navigate("/");
     } catch (err) {
       toast.error(errMsg(err, "Não foi possível entrar"));
+      setCaptchaKey((k) => k + 1); // o token vale uma vez: pede um novo desafio
     } finally {
       setBusy(false);
     }
@@ -54,7 +58,8 @@ export default function Login() {
                 <Label htmlFor="senha">Senha</Label>
                 <Input id="senha" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
               </div>
-              <Button type="submit" className="w-full" disabled={busy}>
+              <Turnstile onToken={setCaptcha} resetKey={captchaKey} />
+              <Button type="submit" className="w-full" disabled={busy || (turnstileEnabled && !captcha)}>
                 {busy ? "Entrando..." : "Entrar"}
               </Button>
               <p className="text-xs text-center text-muted-foreground">Esqueceu a senha? Peça um novo link à administração.</p>
