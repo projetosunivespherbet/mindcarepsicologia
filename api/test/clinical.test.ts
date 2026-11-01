@@ -75,8 +75,8 @@ describe("risco de abandono", () => {
     await s.passada(6, "faltou");
     const outro = (await call("POST", "/patients", { token: s.psiA.token, body: { nome: "Paciente Dois" } })).json;
     await ownerPool.query(
-      `INSERT INTO appointments (clinic_id, patient_id, professional_id, starts_at, ends_at, status, created_by)
-       VALUES ($1, $2, $3, now() - interval '30 days', now() - interval '30 days' + interval '50 minutes', 'realizado', $3)`,
+      `INSERT INTO appointments (clinic_id, patient_id, professional_id, starts_at, ends_at, status, valor, created_by)
+       VALUES ($1, $2, $3, now() - interval '30 days', now() - interval '30 days' + interval '50 minutes', 'realizado', 200, $3)`,
       [s.c.clinicId, outro.id, s.psiA.id],
     );
     const r = await call("GET", "/appointments/attention", { token: s.psiA.token });
