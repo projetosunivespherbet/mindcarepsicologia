@@ -34,6 +34,7 @@ function DataForm({ patient }: { patient: PatientDetailType }) {
     nome: patient.nome,
     cpf: patient.cpf ?? "",
     cns: patient.cns ?? "",
+    endereco: patient.endereco ?? "",
     data_nascimento: patient.data_nascimento ?? "",
     telefone: patient.telefone ?? "",
     email: patient.email ?? "",
@@ -51,6 +52,7 @@ function DataForm({ patient }: { patient: PatientDetailType }) {
           nome: f.nome,
           cpf: f.cpf.trim() || null,
           cns: f.cns.trim() || null,
+          endereco: f.endereco.trim() || null,
           data_nascimento: f.data_nascimento || null,
           telefone: f.telefone || null,
           email: f.email || null,
@@ -90,6 +92,10 @@ function DataForm({ patient }: { patient: PatientDetailType }) {
       <div className="space-y-2">
         <Label htmlFor="d-nasc">Nascimento</Label>
         <Input id="d-nasc" type="date" value={f.data_nascimento} onChange={set("data_nascimento")} />
+      </div>
+      <div className="space-y-2 sm:col-span-2">
+        <Label htmlFor="d-end">Endereço</Label>
+        <Input id="d-end" maxLength={300} placeholder="Rua, número, bairro, cidade/UF" value={f.endereco} onChange={set("endereco")} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="d-tel">Telefone</Label>

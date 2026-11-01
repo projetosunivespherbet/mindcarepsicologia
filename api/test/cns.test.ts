@@ -25,6 +25,8 @@ describe("CNS (Cartão Nacional de Saúde)", () => {
 
     const troca = await call("PATCH", `/patients/${novo.json.id}`, { token: psi.token, body: { cns: "898000000000002" } });
     expect(troca.json.cns).toBe("898000000000002");
+    const end = await call("PATCH", `/patients/${novo.json.id}`, { token: psi.token, body: { endereco: "  Rua A, 10, Centro, Cajamar/SP " } });
+    expect(end.json.endereco).toBe("Rua A, 10, Centro, Cajamar/SP");
     const limpo = await call("PATCH", `/patients/${novo.json.id}`, { token: psi.token, body: { cns: null } });
     expect(limpo.json.cns).toBeNull();
   });

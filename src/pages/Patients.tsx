@@ -42,7 +42,7 @@ export default function Patients() {
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ nome: "", cpf: "", cns: "", data_nascimento: "", telefone: "", email: "", professional_id: "" });
+  const [form, setForm] = useState({ nome: "", cpf: "", cns: "", endereco: "", data_nascimento: "", telefone: "", email: "", professional_id: "" });
   const list = useQuery({ queryKey: ["patients", q], queryFn: () => api<Patient[]>(`/patients?q=${encodeURIComponent(q)}`) });
 
   const create = useMutation({
@@ -52,6 +52,7 @@ export default function Patients() {
           nome: form.nome,
           cpf: form.cpf.trim() || null,
           cns: form.cns.trim() || null,
+          endereco: form.endereco.trim() || null,
           data_nascimento: form.data_nascimento || null,
           telefone: form.telefone || null,
           email: form.email || null,
@@ -156,6 +157,10 @@ export default function Patients() {
                 <Label htmlFor="p-tel">Telefone</Label>
                 <Input id="p-tel" value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="p-end">Endereço</Label>
+              <Input id="p-end" maxLength={300} placeholder="Rua, número, bairro, cidade/UF" value={form.endereco} onChange={(e) => setForm({ ...form, endereco: e.target.value })} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="p-email">E-mail</Label>

@@ -6,12 +6,13 @@ import { requireAuth } from "../middleware";
 import type { AppEnv } from "../types";
 import { cnsSchema, cpfSchema, emailSchema, nameSchema, optText, readBody, readQuery } from "../validation";
 
-const COLS = "id, nome, cpf, cns, data_nascimento::text AS data_nascimento, telefone, email, genero, estado_civil, profissao, professional_id, ativo, created_at, updated_at";
+const COLS = "id, nome, cpf, cns, endereco, data_nascimento::text AS data_nascimento, telefone, email, genero, estado_civil, profissao, professional_id, ativo, created_at, updated_at";
 
 const patientFields = {
   nome: nameSchema,
   cpf: cpfSchema.optional().nullable(),
   cns: cnsSchema.optional().nullable(),
+  endereco: optText(300),
   data_nascimento: z.iso.date().optional().nullable(),
   telefone: optText(30),
   email: emailSchema.optional().nullable(),
@@ -54,10 +55,10 @@ patients.post("/", async (c) => {
   const row = await withSession(c.get("pool"), s, async (db) => {
     await assertProfessional(db, professionalId);
     const r = await db.query(
-      `INSERT INTO patients (clinic_id, nome, cpf, cns, data_nascimento, telefone, email, genero, estado_civil, profissao, professional_id, created_by)
-       VALUES ($1, $2, $11, $12, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING ${COLS}`,
+      `INSERT INTO patients (clinic_id, nome, cpf, cns, endereco, data_nascimento, telefone, email, genero, estado_civil, profissao, professional_id, created_by)
+       VALUES ($1, $2, $11, $12, $13, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING ${COLS}`,
       [s.clinicId, body.nome, body.data_nascimento ?? null, body.telefone ?? null, body.email ?? null,
-       body.genero ?? null, body.estado_civil ?? null, body.profissao ?? null, professionalId, s.userId, body.cpf ?? null, body.cns ?? null],
+       body.genero ?? null, body.estado_civil ?? null, body.profissao ?? null, professionalId, s.userId, body.cpf ?? null, body.cns ?? null, body.endereco || null],
     );
     await audit(db, s, "patient.create", "patient", r.rows[0].id);
     return r.rows[0];
@@ -116,7 +117,7 @@ patients.post("/:id/records/export", async (c) => {
   const body = await readBody(c, z.object({ sessoes: z.array(z.object({ id: z.uuid(), anotacoes: z.boolean() })).min(1, "Escolha ao menos uma sessão").max(200) }));
   const incluir = new Map(body.sessoes.map((x) => [x.id, x.anotacoes]));
   const out = await withSession(c.get("pool"), s, async (db) => {
-    const p = (await db.query(`SELECT nome, cpf, cns, data_nascimento::text AS data_nascimento FROM patients WHERE id = $1`, [c.req.param("id")])).rows[0];
+    const p = (await db.query(`SELECT nome, cpf, cns, endereco, data_nascimento::text AS data_nascimento FROM patients WHERE id = $1`, [c.req.param("id")])).rows[0];
     if (!p) throw new HTTPException(404, { message: "Paciente não encontrado" });
     const prof = (await db.query(`SELECT nome, crp FROM users WHERE id = app_user()`)).rows[0];
     const clinica = (await db.query(`SELECT nome FROM clinics WHERE id = app_clinic()`)).rows[0];

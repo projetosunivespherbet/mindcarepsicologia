@@ -73,6 +73,7 @@ export interface Patient {
   nome: string;
   cpf: string | null;
   cns: string | null;
+  endereco: string | null;
   data_nascimento: string | null;
   telefone: string | null;
   email: string | null;

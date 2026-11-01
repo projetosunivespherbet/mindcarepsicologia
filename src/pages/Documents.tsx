@@ -99,6 +99,8 @@ export function DocumentNew() {
     return t && t in DOCUMENT_TYPES ? (t as DocumentTypeKey) : "";
   });
   const patients = useQuery({ queryKey: ["patients", ""], queryFn: () => api<Patient[]>("/patients") });
+  const [comEndereco, setComEndereco] = useState(false);
+  const escolhido = patients.data?.find((p) => p.id === patientId);
 
   const create = useMutation({
     mutationFn: () => {
@@ -111,6 +113,7 @@ export function DocumentNew() {
         clinica: user!.clinic_nome,
         cpf: patient.cpf,
         cns: patient.cns,
+        endereco: comEndereco ? patient.endereco : null,
         inicio: params.get("inicio"),
         fim: params.get("fim"),
       };
@@ -145,6 +148,21 @@ export function DocumentNew() {
               ))}
             </SelectContent>
           </Select>
+          {escolhido && (
+            <div className="space-y-1 pt-1 text-sm">
+              <p className="text-muted-foreground">
+                O texto já sai com {[escolhido.cpf && "CPF", escolhido.cns && "CNS"].filter(Boolean).join(" e ") || "o nome (sem CPF ou CNS cadastrados)"} do paciente.
+              </p>
+              {escolhido.endereco ? (
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={comEndereco} onChange={(e) => setComEndereco(e.target.checked)} />
+                  Incluir o endereço do paciente
+                </label>
+              ) : (
+                <p className="text-xs text-muted-foreground">Para incluir o endereço, cadastre-o na ficha do paciente.</p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
       <Card>

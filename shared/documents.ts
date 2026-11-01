@@ -16,7 +16,7 @@ export interface SectionDef {
   label: string;
   hint: string;
   required: boolean;
-  /** Texto-base pré-preenchido; aceita {{paciente}}, {{identificacao}} (", portador do CPF X e do CNS Y,"), {{cpf}}, {{cns}}, {{quando}} (data e horário da sessão), {{psicologo}}, {{crp}}, {{clinica}}. */
+  /** Texto-base pré-preenchido; aceita {{paciente}}, {{identificacao}} (", portador do CPF X e do CNS Y, residente em Z," — só o que houver), {{cpf}}, {{cns}}, {{quando}} (data e horário da sessão), {{psicologo}}, {{crp}}, {{clinica}}. */
   template?: string;
 }
 
@@ -69,7 +69,7 @@ export const DOCUMENT_TYPES: Record<DocumentTypeKey, DocumentTypeDef> = {
         label: "Fato constatado",
         hint: "Restrinja-se à informação solicitada.",
         required: true,
-        template: "Atesto, com base em avaliação psicológica realizada, que {{paciente}} [descrever o fato constatado].",
+        template: "Atesto, com base em avaliação psicológica realizada, que {{paciente}}{{identificacao}} [descrever o fato constatado].",
       },
     ],
   },
@@ -151,7 +151,7 @@ export const DOCUMENT_TYPES: Record<DocumentTypeKey, DocumentTypeDef> = {
         label: "Motivo do encaminhamento",
         hint: "Sem detalhes além do necessário.",
         required: true,
-        template: "Encaminho {{paciente}} para avaliação e acompanhamento, pelo seguinte motivo: [descrever].",
+        template: "Encaminho {{paciente}}{{identificacao}} para avaliação e acompanhamento, pelo seguinte motivo: [descrever].",
       },
     ],
   },
@@ -171,7 +171,7 @@ export const DOCUMENT_TYPES: Record<DocumentTypeKey, DocumentTypeDef> = {
         hint: "",
         required: true,
         template:
-          "Este termo formaliza a prestação de serviços psicológicos por {{psicologo}} (CRP {{crp}}), na {{clinica}}, a {{paciente}}, mediante consentimento livre e esclarecido, com atendimentos em dia e horário previamente combinados.",
+          "Este termo formaliza a prestação de serviços psicológicos por {{psicologo}} (CRP {{crp}}), na {{clinica}}, a {{paciente}}{{identificacao}} mediante consentimento livre e esclarecido, com atendimentos em dia e horário previamente combinados.",
       },
       {
         key: "sigilo",
@@ -259,15 +259,19 @@ export interface TemplateContext {
   /** Só dígitos; omitidos se o paciente não tem o dado cadastrado. */
   cpf?: string | null;
   cns?: string | null;
+  /** Endereço: só entra quando o profissional escolhe incluir. */
+  endereco?: string | null;
   /** Sessão a que o documento se refere (ISO). Sem ela, o texto pede para preencher data e horário. */
   inicio?: string | null;
   fim?: string | null;
 }
 
-/** ", portador do CPF X e do CNS Y," — só com o que está cadastrado; vazio se nada. */
-export function identificacaoPaciente(cpf?: string | null, cns?: string | null): string {
+/** ", portador do CPF X e do CNS Y, residente em Z," — só com o que está cadastrado; vazio se nada. */
+export function identificacaoPaciente(cpf?: string | null, cns?: string | null, endereco?: string | null): string {
   const partes = [cpf ? `do CPF ${formatCpf(cpf)}` : "", cns ? `do CNS ${formatCns(cns)}` : ""].filter(Boolean);
-  return partes.length ? `, portador ${partes.join(" e ")},` : "";
+  const doc = partes.length ? `, portador ${partes.join(" e ")}` : "";
+  const end = endereco?.trim() ? `, residente em ${endereco.trim()}` : "";
+  return doc || end ? `${doc}${end},` : "";
 }
 
 function quando(inicio?: string | null, fim?: string | null): string {
@@ -280,7 +284,7 @@ function quando(inicio?: string | null, fim?: string | null): string {
 export function fillTemplate(text: string, ctx: TemplateContext) {
   return text
     .split("{{paciente}}").join(ctx.paciente)
-    .split("{{identificacao}}").join(identificacaoPaciente(ctx.cpf, ctx.cns))
+    .split("{{identificacao}}").join(identificacaoPaciente(ctx.cpf, ctx.cns, ctx.endereco))
     .split("{{cpf}}").join(ctx.cpf ? formatCpf(ctx.cpf) : "[CPF]")
     .split("{{cns}}").join(ctx.cns ? formatCns(ctx.cns) : "[CNS]")
     .split("{{quando}}").join(quando(ctx.inicio, ctx.fim))
