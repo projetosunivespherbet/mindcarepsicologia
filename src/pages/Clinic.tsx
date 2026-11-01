@@ -33,7 +33,7 @@ function maskDoc(tipo: string, d: string) {
   return d;
 }
 
-const emptyForm = { nome: "", timezone: "America/Sao_Paulo", tipo: NONE, documento: "", razao_social: "", telefone: "", email: "", endereco: "" };
+const emptyForm = { nome: "", timezone: "America/Sao_Paulo", tipo: NONE, documento: "", razao_social: "", telefone: "", email: "", endereco: "", encarregado_nome: "", encarregado_email: "" };
 
 export default function ClinicPage() {
   const qc = useQueryClient();
@@ -50,6 +50,8 @@ export default function ClinicPage() {
       razao_social: c.razao_social ?? "",
       telefone: c.telefone ?? "",
       email: c.email ?? "",
+      encarregado_nome: c.encarregado_nome ?? "",
+      encarregado_email: c.encarregado_email ?? "",
       endereco: c.endereco ?? "",
     });
 
@@ -70,6 +72,8 @@ export default function ClinicPage() {
           telefone: form.telefone.trim(),
           email: form.email.trim(),
           endereco: form.endereco.trim(),
+          encarregado_nome: form.encarregado_nome.trim(),
+          encarregado_email: form.encarregado_email.trim(),
         },
       }),
     onSuccess: async (c) => {
@@ -155,6 +159,19 @@ export default function ClinicPage() {
           <Label htmlFor="c-end">Endereço (opcional)</Label>
           <Input id="c-end" maxLength={300} placeholder="Rua, número, bairro, cidade/UF, CEP" value={form.endereco} onChange={set("endereco")} />
         </div>
+
+        <fieldset className="grid gap-4 rounded-lg border p-3 sm:grid-cols-2">
+          <legend className="px-1 text-sm font-medium">Encarregado de dados (LGPD)</legend>
+          <p className="text-xs text-muted-foreground sm:col-span-2">Quem responde aos pacientes sobre os dados pessoais. Aparece na página de Políticas.</p>
+          <div className="space-y-2">
+            <Label htmlFor="c-dpo">Nome</Label>
+            <Input id="c-dpo" maxLength={160} value={form.encarregado_nome} onChange={set("encarregado_nome")} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="c-dpo-email">E-mail</Label>
+            <Input id="c-dpo-email" type="email" maxLength={160} value={form.encarregado_email} onChange={set("encarregado_email")} />
+          </div>
+        </fieldset>
 
         <div className="space-y-2">
           <Label>Fuso horário</Label>

@@ -113,3 +113,17 @@ describe("edição de usuários pelo administrador", () => {
     expect((await call("PATCH", `/users/${rec.id}`, { token: rec.token, body: { nome: "Outro Nome" } })).status).toBe(403);
   });
 });
+
+describe("encarregado de dados e informações públicas da clínica", () => {
+  it("a administração define o encarregado; qualquer pessoa logada lê as informações da clínica", async () => {
+    const c = await mkClinic();
+    const rec = await mkUser(c.adminToken, { nome: "Rita Recepção", role: "recepcao" });
+    const r = await call("PATCH", "/clinic", { token: c.adminToken, body: { encarregado_nome: "Ana Souza", encarregado_email: "DPO@Clinica.test" } });
+    expect(r.json).toMatchObject({ encarregado_nome: "Ana Souza", encarregado_email: "dpo@clinica.test" });
+    expect((await call("PATCH", "/clinic", { token: c.adminToken, body: { encarregado_email: "nao-e-email" } })).status).toBe(400);
+    const info = await call("GET", "/clinic-info", { token: rec.token });
+    expect(info.status).toBe(200);
+    expect(info.json).toMatchObject({ nome: "Clínica Teste", encarregado_nome: "Ana Souza", encarregado_email: "dpo@clinica.test" });
+    expect((await call("GET", "/clinic-info")).status).toBe(401);
+  });
+});

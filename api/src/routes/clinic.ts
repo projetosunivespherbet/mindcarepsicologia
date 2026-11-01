@@ -7,7 +7,7 @@ import type { AppEnv } from "../types";
 import { cnpjSchema, cpfSchema, emailSchema, nameSchema, optText, readBody } from "../validation";
 import { setClause } from "./finance";
 
-const COLS = "id, nome, timezone, documento_tipo, documento, razao_social, telefone, email, endereco, updated_at";
+const COLS = "id, nome, timezone, documento_tipo, documento, razao_social, telefone, email, endereco, encarregado_nome, encarregado_email, updated_at";
 
 export const clinic = new Hono<AppEnv>();
 clinic.use("*", requireAuth, requireRole("admin"));
@@ -37,6 +37,8 @@ clinic.patch("/", async (c) => {
         telefone: optText(30),
         email: optText(160),
         endereco: optText(300),
+        encarregado_nome: optText(160),
+        encarregado_email: optText(160),
       })
       .partial(),
   );
@@ -85,8 +87,18 @@ clinic.patch("/", async (c) => {
   }
   if (body.telefone !== undefined) fields.telefone = blank(body.telefone);
   if (body.endereco !== undefined) fields.endereco = blank(body.endereco);
+  if (body.encarregado_nome !== undefined) {
+    const v = blank(body.encarregado_nome);
+    if (v !== null && v.length < 2) throw bad("Nome do encarregado muito curto");
+    fields.encarregado_nome = v;
+  }
+  if (body.encarregado_email !== undefined) {
+    const v = blank(body.encarregado_email);
+    if (v !== null && !emailSchema.safeParse(v).success) throw bad("E-mail do encarregado inválido");
+    fields.encarregado_email = v?.toLowerCase() ?? null;
+  }
 
-  const { sets, values } = setClause(fields, ["nome", "timezone", "documento_tipo", "documento", "razao_social", "telefone", "email", "endereco"], 2);
+  const { sets, values } = setClause(fields, ["nome", "timezone", "documento_tipo", "documento", "razao_social", "telefone", "email", "endereco", "encarregado_nome", "encarregado_email"], 2);
   const row = await withSession(c.get("pool"), s, async (db) => {
     const r = await db.query(`UPDATE clinics SET ${sets} WHERE id = $1 RETURNING ${COLS}`, [s.clinicId, ...values]);
     if (r.rows[0]) await audit(db, s, "clinic.update", "clinic", r.rows[0].id);

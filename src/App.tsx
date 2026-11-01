@@ -19,6 +19,8 @@ import NotFound from "./pages/NotFound";
 import PatientDetail from "./pages/PatientDetail";
 import Atendimento from "./pages/Atendimento";
 import PatientNew from "./pages/PatientNew";
+import Policies from "./pages/Policies";
+import UsefulLinks from "./pages/UsefulLinks";
 import Patients from "./pages/Patients";
 import Users from "./pages/Users";
 import VerifyDocument from "./pages/VerifyDocument";
@@ -71,6 +73,8 @@ function AppRoutes() {
         <Route path="/documentos/novo" element={<Guard allow={canDocs}><DocumentNew /></Guard>} />
         <Route path="/documentos/:id" element={<Guard allow={canDocs}><DocumentEditor /></Guard>} />
         <Route path="/agenda" element={<Agenda />} />
+        <Route path="/politicas" element={<Policies />} />
+        <Route path="/links" element={<UsefulLinks />} />
         <Route path="/financeiro" element={<Finance />} />
         <Route path="/nota-fiscal" element={<Guard allow={canDocs}><Fiscal /></Guard>} />
         <Route path="/papel-timbrado" element={<Guard allow={isAdmin}><Letterheads /></Guard>} />

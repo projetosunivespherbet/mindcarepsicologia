@@ -1,4 +1,4 @@
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, Link } from "react-router-dom";
 import { Brain, Building2, CalendarDays, FileText, Wallet, LogOut, Palette, Receipt, UserCog, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -72,6 +72,14 @@ export function AppShell() {
       <main className="max-w-6xl mx-auto px-4 py-6">
         <Outlet />
       </main>
+      <footer className="max-w-6xl mx-auto flex flex-wrap gap-4 border-t px-4 py-4 text-xs text-muted-foreground">
+        <Link to="/politicas" className="hover:text-foreground hover:underline">
+          Políticas e privacidade (LGPD)
+        </Link>
+        <Link to="/links" className="hover:text-foreground hover:underline">
+          Links úteis
+        </Link>
+      </footer>
     </div>
   );
 }

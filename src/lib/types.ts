@@ -30,6 +30,8 @@ export interface Clinic {
   telefone: string | null;
   email: string | null;
   endereco: string | null;
+  encarregado_nome: string | null;
+  encarregado_email: string | null;
   updated_at: string;
 }
 

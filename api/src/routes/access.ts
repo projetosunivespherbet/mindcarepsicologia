@@ -138,3 +138,16 @@ access.post("/auth/change-password", requireAuth, async (c) => {
   });
   return c.json({ ok: true });
 });
+
+// Dados públicos da clínica (controladora dos dados), para as políticas internas: qualquer pessoa logada lê.
+access.get("/clinic-info", requireAuth, async (c) => {
+  const row = await withSession(c.get("pool"), c.get("session"), async (db) =>
+    (
+      await db.query(
+        `SELECT nome, razao_social, documento_tipo, documento, telefone, email, endereco, encarregado_nome, encarregado_email
+           FROM clinics WHERE id = app_clinic()`,
+      )
+    ).rows[0],
+  );
+  return c.json(row ?? null);
+});
