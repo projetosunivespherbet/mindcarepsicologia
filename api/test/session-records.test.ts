@@ -212,7 +212,7 @@ describe("trilha e documento do prontuário", () => {
 
     expect((await exp(s.psiA.token, [])).status).toBe(400);
     for (const token of [s.rec.token, s.c.adminToken]) expect((await exp(token, [{ id: a, anotacoes: true }])).status).toBe(403);
-    expect((await exp(s.psiB.token, [{ id: a, anotacoes: true }])).json.itens).toEqual([]);
+    expect((await exp(s.psiB.token, [{ id: a, anotacoes: true }])).status).toBe(404); // paciente de outro psicólogo
     const log = await ownerPool.query("SELECT count(*)::int AS n FROM audit_log WHERE clinic_id = $1 AND action = 'session_record.export'", [s.c.clinicId]);
     expect(log.rows[0].n).toBe(2);
   });
