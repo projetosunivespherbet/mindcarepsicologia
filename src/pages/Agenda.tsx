@@ -679,6 +679,9 @@ export default function Agenda() {
 
   const actions = (a: Appointment) => {
     const open = a.status === "agendado" || a.status === "confirmado";
+    // Realizada e falta só valem depois que a sessão começou (cancelar e confirmar podem ser feitos antes).
+    const started = new Date(a.starts_at).getTime() <= Date.now();
+    const wait = started ? undefined : "Disponível a partir do horário de início da sessão";
     return (
                       <div className="flex flex-wrap items-center gap-2">
                           <Badge variant={STATUS[a.status].variant}>{STATUS[a.status].label}</Badge>
@@ -701,10 +704,10 @@ export default function Agenda() {
                                   Confirmar
                                 </Button>
                               )}
-                              <Button size="sm" disabled={setStatus.isPending} onClick={() => setStatus.mutate({ a, status: "realizado" })}>
+                              <Button size="sm" disabled={setStatus.isPending || !started} title={wait} onClick={() => setStatus.mutate({ a, status: "realizado" })}>
                                 Realizada
                               </Button>
-                              <Button size="sm" variant="outline" disabled={setStatus.isPending} onClick={() => setStatus.mutate({ a, status: "faltou" })}>
+                              <Button size="sm" variant="outline" disabled={setStatus.isPending || !started} title={wait} onClick={() => setStatus.mutate({ a, status: "faltou" })}>
                                 Faltou
                               </Button>
                               <Button size="sm" variant="ghost" disabled={setStatus.isPending} onClick={() => setStatus.mutate({ a, status: "cancelado" })}>

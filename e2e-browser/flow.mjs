@@ -311,7 +311,7 @@ await step("psicólogo agenda a sessão de hoje e marca como realizada (a cobran
   await psi.waitForSelector("#s-pac option:nth-child(2)", { timeout: T });
   patientId = await psi.$eval("#s-pac option:nth-child(2)", (e) => e.value);
   await psi.select("#s-pac", patientId);
-  await setInput(psi, "#s-hora", "14:00");
+  await setInput(psi, "#s-hora", "00:10");
   await fill(psi, "#s-valor", "175");
   await click(psi, aria("Agendar", "button"));
   await see(psi, "Agendado");
@@ -386,7 +386,7 @@ await step("psicólogo registra uma sessão pro bono (sem valor, sem cobrança) 
   await click(psi, aria("Nova sessão", "button"));
   await psi.waitForSelector("#s-pac option:nth-child(2)", { timeout: T });
   await psi.select("#s-pac", patientId);
-  await setInput(psi, "#s-hora", "16:00");
+  await setInput(psi, "#s-hora", "02:00");
   await fill(psi, "#s-valor", "150");
   await click(psi, aria("Agendar", "button"));
   await click(psi, aria("Realizada", "button"));

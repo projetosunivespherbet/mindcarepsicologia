@@ -296,11 +296,11 @@ describe.skipIf(!process.env.E2E_PG)("fluxo completo: telas + API + Postgres", (
     const seletor = await screen.findByLabelText("Paciente");
     await screen.findByRole("option", { name: "Maria Souza" }); // a lista de pacientes chega depois do diálogo abrir
     await user.selectOptions(seletor, seed.patient.id);
-    fireEvent.change(screen.getByLabelText("Início"), { target: { value: "14:00" } });
+    fireEvent.change(screen.getByLabelText("Início"), { target: { value: "00:10" } });
     await user.type(screen.getByLabelText("Valor (R$)"), "180");
     await user.click(screen.getByRole("button", { name: "Agendar" }));
     expect(await screen.findByText("Agendado")).toBeInTheDocument();
-    expect(screen.getByText(/14:00–14:50/)).toBeInTheDocument();
+    expect(screen.getByText(/00:10–01:00/)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Realizada" }));
     expect(await screen.findByText("Realizado")).toBeInTheDocument();
@@ -310,7 +310,7 @@ describe.skipIf(!process.env.E2E_PG)("fluxo completo: telas + API + Postgres", (
 
     // segunda sessão do dia, marcada como falta (não gera cobrança)
     const hoje = new Date();
-    const at16 = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 16, 0);
+    const at16 = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 2, 0);
     await call("POST", "/appointments", { token: seed.anaToken, body: { patient_id: seed.patient.id, starts_at: at16.toISOString(), ends_at: new Date(at16.getTime() + 50 * 60_000).toISOString(), valor: 180 } });
     await openApp("/agenda", seed.anaToken);
     await user.click(await screen.findByRole("button", { name: "Faltou" }));
@@ -368,7 +368,7 @@ describe.skipIf(!process.env.E2E_PG)("fluxo completo: telas + API + Postgres", (
     const seletor = await screen.findByLabelText("Paciente");
     await screen.findByRole("option", { name: "Maria Souza" });
     await user.selectOptions(seletor, seed.patient.id);
-    fireEvent.change(screen.getByLabelText("Início"), { target: { value: "20:00" } });
+    fireEvent.change(screen.getByLabelText("Início"), { target: { value: "03:30" } });
     await user.selectOptions(screen.getByLabelText("Tipo de atendimento"), "pro_bono");
     expect(screen.getByLabelText("Valor (R$)")).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Agendar" }));
