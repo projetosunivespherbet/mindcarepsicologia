@@ -67,7 +67,7 @@ describe("exportação para o Receita Saúde", () => {
     await pagar(s, ch.id, "05");
 
     const semCpfPsi = await exportar(s.psi.token);
-    expect(semCpfPsi.json.avisos[0]).toMatch(/CPF do psicólogo/);
+    expect(semCpfPsi.json.avisos[0]).toMatch(/Pendente de CPF do psicólogo/);
     expect(semCpfPsi.json.arquivos).toHaveLength(0);
 
     await call("PATCH", `/users/${s.psi.id}`, { token: s.adminToken, body: { cpf: CPF_PSI } });
@@ -81,7 +81,7 @@ describe("exportação para o Receita Saúde", () => {
     const r = await exportar(s.psi.token);
     expect(r.json.resumo).toMatchObject({ pagamentos: 3, prontos: 1, com_pendencia: 2 });
     const problemas = r.json.linhas.flatMap((l: { problemas: string[] }) => l.problemas).join(" | ");
-    expect(problemas).toMatch(/Paciente sem CPF/);
+    expect(problemas).toMatch(/Pendente de CPF/);
     expect(problemas).toMatch(/pessoa jurídica/);
   });
 

@@ -659,14 +659,14 @@ finance.get("/receita-saude", requireRole("admin", "psicologo"), async (c) => {
   });
 
   const avisosProf: string[] = [];
-  if (!prof.cpf) avisosProf.push("O CPF do psicólogo não está cadastrado (a administração informa em Usuários > Editar)");
+  if (!prof.cpf) avisosProf.push("Pendente de CPF do psicólogo (a administração informa em Usuários > Editar)");
   if (prof.crp && String(prof.crp).length > 15) avisosProf.push("O CRP tem mais de 15 caracteres (limite do arquivo)");
 
   const linhas = rows.map((r: any) => {
     const problemas: string[] = [];
     const cpfPagador = r.pagador_e_paciente ? r.cpf_paciente : r.doc_pagador && String(r.doc_pagador).length === 11 ? r.doc_pagador : null;
-    if (!r.cpf_paciente) problemas.push("Paciente sem CPF");
-    if (!r.pagador_e_paciente && !r.doc_pagador) problemas.push("Responsável financeiro sem CPF");
+    if (!r.cpf_paciente) problemas.push("Pendente de CPF");
+    if (!r.pagador_e_paciente && !r.doc_pagador) problemas.push("Pendente de CPF do responsável financeiro");
     if (!r.pagador_e_paciente && r.doc_pagador && String(r.doc_pagador).length !== 11) problemas.push("Pagador é pessoa jurídica (o recibo é só para pessoa física)");
     const descricao = r.sessao_dia ? `Sessão de psicologia realizada em ${r.sessao_dia}` : "Atendimento psicológico";
     return {
