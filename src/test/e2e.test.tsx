@@ -323,6 +323,7 @@ describe.skipIf(!process.env.E2E_PG)("fluxo completo: telas + API + Postgres", (
     const abrir = await screen.findAllByRole("button", { name: "Abrir" }, { timeout: 5000 });
     await user.click(abrir[1]!); // a primeira é a sessão já realizada; a segunda, das 02:00
     await user.click(await screen.findByRole("button", { name: "Faltou" }, { timeout: 5000 }));
+    await user.click(await screen.findByRole("button", { name: "Não cobrar" }));
     expect(await screen.findByText("Faltou", { selector: "span, div" })).toBeInTheDocument();
     expect((await cobrancas()).filter((c) => c.valor_centavos === 18000)).toHaveLength(1);
   }, 40_000);

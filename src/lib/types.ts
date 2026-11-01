@@ -245,6 +245,10 @@ export interface Appointment {
   prontuario: boolean | null;
   /** Nome de quem marcou a sessão. */
   agendado_por: string | null;
+  /** Cobrança avulsa ativa da sessão (nulo se não há ou se o usuário não a enxerga). */
+  charge_id: string | null;
+  /** Pacote do qual a sessão foi descontada. */
+  package_id: string | null;
   created_at: string;
   imposto: boolean;
   series_id: string | null;
@@ -289,4 +293,19 @@ export interface TimeBlock {
   starts_at: string;
   ends_at: string;
   motivo: string | null;
+}
+
+export interface SessionPackage {
+  id: string;
+  patient_id: string;
+  professional_id: string;
+  sessoes: number;
+  usadas: number;
+  saldo: number;
+  valor_centavos: number;
+  status: "ativo" | "encerrado";
+  charge_id: string;
+  charge_status: ChargeStatus;
+  charge_paid_centavos: number;
+  created_at: string;
 }

@@ -40,7 +40,7 @@ export function RecordEditor({ rec, onSaved }: { rec: SessionRecord; onSaved: ()
       else if (rec.conteudo) throw new Error("O prontuário não pode ficar em branco");
       else if (!anotacoes.trim() && !rec.anotacoes) throw new Error("Escreva o prontuário ou uma anotação privativa");
       await api(`/appointments/${rec.appointment_id}/record`, { method: "PUT", body });
-      return concluir ? await marcarRealizada({ id: rec.appointment_id, patient_id: rec.patient_id, atendimento: rec.atendimento }) : null;
+      return concluir ? await marcarRealizada({ id: rec.appointment_id, patient_id: rec.patient_id, atendimento: rec.atendimento, starts_at: rec.starts_at }) : null;
     },
     onSuccess: (cobranca) => {
       if (cobranca) avisoRealizada(cobranca);

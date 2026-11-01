@@ -1,11 +1,18 @@
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { DetailDialog } from "@/components/PatientCharges";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
+import { api, errMsg } from "@/lib/api";
 import { dayKey, dayLabel, hhmm } from "@/lib/dates";
 import { downloadIcs, icsContent, reminderText, whatsappNumber, whatsappUrl } from "@/lib/reminder";
-import type { Appointment, AppointmentStatus, Patient } from "@/lib/types";
+import type { Appointment, AppointmentStatus, Patient, SessionPackage } from "@/lib/types";
+
+export type FaltaModo = "pacote" | "cobrar" | "nada";
 import { formatCns, formatCpf } from "@shared/documents";
 
 export const STATUS: Record<AppointmentStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -53,7 +60,7 @@ export function SessionCard({
   proName?: string;
   busy: boolean;
   onClose: () => void;
-  onStatus: (a: Appointment, status: AppointmentStatus) => void;
+  onStatus: (a: Appointment, status: AppointmentStatus, falta?: FaltaModo) => void;
   onReschedule: (a: Appointment) => void;
   onHistory: (a: Appointment) => void;
 }) {
@@ -66,8 +73,37 @@ export function SessionCard({
   const wait = started ? undefined : "Disponível a partir do horário de início da sessão";
   const phone = whatsappNumber(patient?.telefone);
   const atender = a ? `/pacientes/${a.patient_id}/atendimento/${a.id}` : "";
+  const qc = useQueryClient();
+  const [perguntaFalta, setPerguntaFalta] = useState(false);
+  const [verCobranca, setVerCobranca] = useState<string | null>(null);
+  useEffect(() => setPerguntaFalta(false), [a?.id]);
+  const pacotes = useQuery({
+    queryKey: ["packages", a?.patient_id],
+    enabled: !!a && open,
+    queryFn: () => api<SessionPackage[]>(`/packages?patient_id=${a!.patient_id}`),
+  });
+  const pacote = (pacotes.data ?? []).find((p) => p.status === "ativo" && p.saldo > 0 && p.professional_id === a?.professional_id);
+  const podeCobrar = !!a && a.status !== "cancelado" && !a.charge_id && !a.package_id && a.atendimento !== "pro_bono";
+  const cobrar = useMutation({
+    mutationFn: () =>
+      api<{ id: string }>("/charges", { body: { patient_id: a!.patient_id, appointment_id: a!.id, vencimento: new Date(a!.starts_at).toLocaleDateString("sv-SE") } }),
+    onSuccess: (ch) => {
+      void qc.invalidateQueries({ queryKey: ["appointments"] });
+      void qc.invalidateQueries({ queryKey: ["charges"] });
+      toast.success("Cobrança criada. Envie o Pix ao paciente.");
+      setVerCobranca(ch.id);
+      onClose();
+    },
+    onError: (e) => toast.error(errMsg(e)),
+  });
+  const abrirCobranca = (id: string) => {
+    setVerCobranca(id);
+    onClose();
+  };
 
   return (
+    <>
+    <DetailDialog chargeId={verCobranca} onClose={() => setVerCobranca(null)} />
     <Dialog open={!!a} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         {a && (
@@ -82,7 +118,9 @@ export function SessionCard({
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={STATUS[a.status].variant}>{STATUS[a.status].label}</Badge>
               {a.atendimento !== "particular" && <Badge variant="outline">{a.atendimento === "pro_bono" ? "Pro bono" : "Convênio"}</Badge>}
-              {a.status === "realizado" && a.valor ? <Badge variant={a.payment_status === "pago" ? "default" : "outline"}>{a.payment_status === "pago" ? "Pago" : "A receber"}</Badge> : null}
+              {a.charge_id ? <Badge variant={a.payment_status === "pago" ? "default" : "outline"}>{a.payment_status === "pago" ? "Pago" : "Cobrança em aberto"}</Badge> : null}
+              {a.package_id && <Badge variant="outline">Pacote</Badge>}
+              {open && !a.package_id && pacote && <Badge variant="outline">Pacote: {pacote.saldo} de {pacote.sessoes} disponíveis</Badge>}
               {a.status === "realizado" && a.nota_status && (
                 <Badge variant={a.nota_status === "emitida" ? "default" : "secondary"}>{a.nota_status === "emitida" ? "Nota emitida" : "Nota em rascunho"}</Badge>
               )}
@@ -130,7 +168,37 @@ export function SessionCard({
                   Cancelar consulta
                 </Button>
               )}
+              {podeCobrar && !pacote && (
+                <Button className="flex-1" variant="outline" disabled={cobrar.isPending} onClick={() => cobrar.mutate()}>
+                  {cobrar.isPending ? "Gerando..." : "Cobrar agora"}
+                </Button>
+              )}
+              {a.charge_id && (
+                <Button className="flex-1" variant="outline" onClick={() => abrirCobranca(a.charge_id!)}>
+                  Ver cobrança / Pix
+                </Button>
+              )}
             </div>
+            {perguntaFalta && (
+              <div role="group" aria-label="Cobrança da falta" className="space-y-2 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
+                <p className="font-medium">O paciente faltou. Como fica a cobrança?</p>
+                <div className="flex flex-wrap gap-2">
+                  {pacote && !a.charge_id && (
+                    <Button size="sm" disabled={busy} onClick={() => onStatus(a, "faltou", "pacote")}>
+                      Descontar do pacote
+                    </Button>
+                  )}
+                  {!a.charge_id && a.atendimento !== "pro_bono" && (
+                    <Button size="sm" variant="outline" disabled={busy} onClick={() => onStatus(a, "faltou", "cobrar")}>
+                      Cobrar a falta
+                    </Button>
+                  )}
+                  <Button size="sm" variant="ghost" disabled={busy} onClick={() => onStatus(a, "faltou", "nada")}>
+                    {a.charge_id ? "Manter a cobrança já gerada" : "Não cobrar"}
+                  </Button>
+                </div>
+              </div>
+            )}
             {open && !started && author && <p className="-mt-1 text-xs text-muted-foreground">O atendimento pode ser iniciado a partir do horário da sessão.</p>}
 
             <div className="flex flex-wrap items-center gap-1 text-sm">
@@ -140,7 +208,7 @@ export function SessionCard({
                 </Button>
               )}
               {open && (
-                <Button size="sm" variant="ghost" disabled={busy || !started} title={wait} onClick={() => onStatus(a, "faltou")}>
+                <Button size="sm" variant="ghost" disabled={busy || !started} title={wait} onClick={() => setPerguntaFalta(true)}>
                   Faltou
                 </Button>
               )}
@@ -186,5 +254,6 @@ export function SessionCard({
         )}
       </DialogContent>
     </Dialog>
+    </>
   );
 }

@@ -5,6 +5,7 @@ import { ArrowLeft, FilePlus2 } from "lucide-react";
 import { toast } from "sonner";
 import { DocStatusBadge } from "@/components/DocStatusBadge";
 import { PatientCharges } from "@/components/PatientCharges";
+import { PatientPackages } from "@/components/PatientPackages";
 import { PatientRecords } from "@/components/PatientRecords";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -280,7 +281,8 @@ export default function PatientDetail() {
                   </p>
                 )}
               </TabsContent>
-              <TabsContent value="cobrancas" className="pt-4">
+              <TabsContent value="cobrancas" className="space-y-6 pt-4">
+                <PatientPackages patient={p} />
                 <PatientCharges patient={p} />
               </TabsContent>
               {canProduceDocuments && (

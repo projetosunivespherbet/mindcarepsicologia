@@ -15,7 +15,8 @@ import { addDays, addMinutes, dayKey, dayLabel, hhmm, localInstant, minutesBetwe
 import { brl, centsToInput, parseBRL } from "@/lib/money";
 import { MiniCalendar, monthGridRange } from "@/components/MiniCalendar";
 import { SessionCard, STATUS } from "@/components/SessionCard";
-import { avisoRealizada, marcarRealizada } from "@/lib/session";
+import { avisoRealizada, cobrarAvulso, marcarRealizada } from "@/lib/session";
+import type { FaltaModo } from "@/components/SessionCard";
 import { ChangeHistory } from "@/components/ChangeHistory";
 import type { Appointment, AppointmentStatus, Atendimento, Patient, Professional, TimeBlock } from "@/lib/types";
 
@@ -582,16 +583,23 @@ export default function Agenda() {
   for (const a of (appts.data ?? []).filter((x) => x.status !== "cancelado")) byDay.set(dayKey(a.starts_at), [...(byDay.get(dayKey(a.starts_at)) ?? []), a]);
 
   const setStatus = useMutation({
-    mutationFn: async ({ a, status }: { a: Appointment; status: AppointmentStatus }) => {
+    mutationFn: async ({ a, status, falta }: { a: Appointment; status: AppointmentStatus; falta?: FaltaModo }) => {
       if (status === "realizado") return { cobranca: await marcarRealizada(a) };
       await api(`/appointments/${a.id}`, { method: "PATCH", body: { status } });
-      return { cobranca: null };
+      // Falta: o profissional decide se desconta do pacote, se cobra avulso ou se não cobra.
+      if (status === "faltou" && falta === "pacote") await api("/packages/use", { body: { appointment_id: a.id } });
+      if (status === "faltou" && falta === "cobrar") return { cobranca: null, falta: await cobrarAvulso(a) };
+      return { cobranca: null, falta: falta ?? null };
     },
-    onSuccess: ({ cobranca }, { status }) => {
+    onSuccess: (r, { status }) => {
       void qc.invalidateQueries({ queryKey: ["appointments"] });
       void qc.invalidateQueries({ queryKey: ["charges"] });
+      void qc.invalidateQueries({ queryKey: ["packages"] });
       setDetail(null);
-      if (cobranca) avisoRealizada(cobranca);
+      if (r.cobranca) avisoRealizada(r.cobranca);
+      else if (status === "faltou" && r.falta === "pacote") toast.success("Falta registrada e descontada do pacote");
+      else if (status === "faltou" && r.falta === "criada") toast.success("Falta registrada e cobrança criada");
+      else if (status === "faltou" && r.falta === "sem-valor") toast.warning("Falta registrada, mas a sessão não tem valor para cobrar");
       else toast.success(`Sessão marcada como ${STATUS[status].label.toLowerCase()}`);
     },
     onError: (e) => toast.error(errMsg(e)),
@@ -614,6 +622,7 @@ export default function Agenda() {
     <div className="flex flex-wrap items-center gap-2">
       <Badge variant={STATUS[a.status].variant}>{STATUS[a.status].label}</Badge>
       {a.atendimento !== "particular" && <Badge variant="outline">{a.atendimento === "pro_bono" ? "Pro bono" : "Convênio"}</Badge>}
+      {a.package_id && <Badge variant="outline">Pacote</Badge>}
       {a.status === "realizado" && a.prontuario !== null && (
         <Badge variant={a.prontuario ? "default" : "outline"} className={a.prontuario ? "" : "border-amber-500 text-amber-700 dark:text-amber-400"}>
           {a.prontuario ? "Prontuário preenchido" : "Prontuário pendente"}
@@ -809,7 +818,7 @@ export default function Agenda() {
         proName={!isPsi && detailAppt ? proName.get(detailAppt.professional_id) : undefined}
         busy={setStatus.isPending}
         onClose={() => setDetail(null)}
-        onStatus={(a, status) => setStatus.mutate({ a, status })}
+        onStatus={(a, status, falta) => setStatus.mutate({ a, status, falta })}
         onReschedule={openEdit}
         onHistory={(a) => openHistory(a.id)}
       />

@@ -8,7 +8,7 @@ import type { AppEnv } from "../types";
 import { isoDateTime, optText, readBody, readQuery } from "../validation";
 
 const COLS = `id, patient_id, professional_id, starts_at, ends_at, tipo, status, valor::float8 AS valor,
-              payment_status, convenio, atendimento, imposto, series_id, created_at, updated_at`;
+              payment_status, convenio, atendimento, imposto, series_id, package_id, created_at, updated_at`;
 // situação da nota da sessão (a cobrança ativa e a nota ativa dela): nulo = ainda sem nota
 const NOTA_STATUS = `(SELECT d.status FROM charges ch JOIN fiscal_document_charges l ON l.charge_id = ch.id AND l.ativo
                       JOIN fiscal_documents d ON d.id = l.document_id
@@ -43,6 +43,8 @@ const appointmentFields = {
 // Prontuário da sessão: true/false só para o profissional da sessão; nulo para os demais (não enxergam o prontuário).
 const PRONTUARIO = `(CASE WHEN professional_id = app_user() THEN EXISTS (SELECT 1 FROM session_records r WHERE r.appointment_id = appointments.id AND r.conteudo <> '') END) AS prontuario`;
 // Quem marcou a sessão (nome), para o card da agenda.
+// Cobrança avulsa ativa da sessão (para "Cobrar agora" / "Ver cobrança"); a RLS de charges esconde o que não é do usuário.
+const CHARGE_ID = `(SELECT ch.id FROM charges ch WHERE ch.appointment_id = appointments.id AND ch.status <> 'cancelada' LIMIT 1) AS charge_id`;
 const AGENDADO_POR = `(SELECT u.nome FROM users u WHERE u.id = appointments.created_by) AS agendado_por`;
 
 /** Só o psicólogo (ou o administrador que atende) escreve e lê prontuários. */
@@ -121,7 +123,7 @@ appointments.get("/", async (c) => {
   const rows = await withSession(c.get("pool"), c.get("session"), async (db) =>
     (
       await db.query(
-        `SELECT ${COLS}, ${NOTA_STATUS}, ${PRONTUARIO}, ${AGENDADO_POR} FROM appointments
+        `SELECT ${COLS}, ${NOTA_STATUS}, ${PRONTUARIO}, ${AGENDADO_POR}, ${CHARGE_ID} FROM appointments
          WHERE starts_at >= $1 AND starts_at < $2
            AND ($3::uuid IS NULL OR professional_id = $3) AND ($4::uuid IS NULL OR patient_id = $4)
          ORDER BY starts_at`,

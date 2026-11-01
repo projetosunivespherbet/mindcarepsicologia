@@ -261,12 +261,12 @@ charges.post("/", async (c) => {
     const tz = (await db.query("SELECT timezone, (now() AT TIME ZONE timezone)::date::text AS hoje FROM clinics WHERE id = $1", [s.clinicId])).rows[0];
 
     let professionalId: string | null = s.role === "psicologo" ? s.userId : (body.professional_id ?? null);
-    type Appt = { patient_id: string; professional_id: string; status: string; atendimento: string; valor_centavos: number | null; competencia: string; convenio: boolean; imposto: boolean };
+    type Appt = { patient_id: string; professional_id: string; status: string; package_id: string | null; atendimento: string; valor_centavos: number | null; competencia: string; convenio: boolean; imposto: boolean };
     let appt: Appt | undefined;
     if (body.appointment_id) {
       appt = (
         await db.query(
-          `SELECT a.patient_id, a.professional_id, a.status, a.atendimento, NULLIF(round(a.valor * 100)::int, 0) AS valor_centavos,
+          `SELECT a.patient_id, a.professional_id, a.status, a.package_id, a.atendimento, NULLIF(round(a.valor * 100)::int, 0) AS valor_centavos,
                   to_char(date_trunc('month', a.starts_at AT TIME ZONE $2), 'YYYY-MM-DD') AS competencia, a.convenio, a.imposto
              FROM appointments a WHERE a.id = $1`,
           [body.appointment_id, tz.timezone],
@@ -276,6 +276,7 @@ charges.post("/", async (c) => {
       if (appt.patient_id !== body.patient_id) throw new HTTPException(422, { message: "A sessão não pertence a este paciente" });
       if (appt.status === "cancelado") throw new HTTPException(422, { message: "Sessão cancelada não gera cobrança" });
       if (appt.atendimento === "pro_bono") throw new HTTPException(422, { message: "Atendimento pro bono não gera cobrança" });
+      if (appt.package_id) throw new HTTPException(422, { message: "Esta sessão já está coberta por um pacote" });
       professionalId = appt.professional_id;
     }
     professionalId ??= patient.professional_id ?? null;
@@ -344,7 +345,7 @@ charges.post("/generate", requireRole("admin", "recepcao"), async (c) => {
                 ) AS valor_centavos
            FROM appointments a JOIN clinics cl ON cl.id = a.clinic_id
           WHERE a.starts_at >= $1 AND a.starts_at < $2
-            AND a.atendimento <> 'pro_bono' AND (a.status = 'realizado' OR ($3::boolean AND a.status = 'faltou'))
+            AND a.atendimento <> 'pro_bono' AND a.package_id IS NULL AND (a.status = 'realizado' OR ($3::boolean AND a.status = 'faltou'))
             AND ($4::uuid IS NULL OR a.professional_id = $4)
             AND NOT EXISTS (SELECT 1 FROM charges ch WHERE ch.appointment_id = a.id AND ch.status <> 'cancelada')
        ), ins AS (
