@@ -186,7 +186,7 @@ for (const p of P) {
 for (const c of charges) {
   const recente = FAKE_NOW - c.when < 13 * 86400e3;
   if (recente && ["jul", "gus", "thi"].includes(c.k)) continue;
-  await call("POST", `/charges/${c.id}/payments`, { token: T, headers: { "Idempotency-Key": `shots-pay-${idem++}-xxxxxxxx` }, body: { valor_centavos: 18000, metodo: ["pix", "pix", "cartao_credito", "dinheiro"][idem % 4] } });
+  await call("POST", `/charges/${c.id}/payments`, { token: T, headers: { "Idempotency-Key": `shots-pay-${idem++}-xxxxxxxx` }, body: { valor_centavos: 18000, metodo: ["pix", "pix", "cartao", "transferencia"][idem % 4] } });
 }
 // observação em agendamentos futuros
 const fut = (k) => appts[k].find((a) => new Date(a.starts_at) > FAKE_NOW);
@@ -217,9 +217,11 @@ for (const [i, j] of [0, 2, 4, 6].entries()) {
   }
 }
 // datas de cobranças e pagamentos coerentes com as sessões
+await owner.query("SET session_replication_role = replica");
 await owner.query(`UPDATE charges ch SET created_at = a.starts_at + interval '1 hour' FROM appointments a WHERE a.id = ch.appointment_id`).catch((e) => console.log("  ! charges", e.message));
 await owner.query(`UPDATE payments pg SET created_at = ch.created_at + interval '2 hours', pago_em = (ch.created_at + interval '2 hours')::date FROM charges ch WHERE ch.id = pg.charge_id`).catch((e) => console.log("  ! payments", e.message));
 
+await owner.query("SET session_replication_role = origin");
 // documento emitido
 const doc = await call("POST", "/documents", { token: T, body: { patient_id: pid.luc, tipo: "declaracao", finalidade: "Apresentação na escola", conteudo: { registro: `Compareceu a atendimento psicológico em ${dayStr(-1, 1).split("-").reverse().join("/")}, das 16h00 às 16h50.` } } });
 if (doc.json?.id) await call("POST", `/documents/${doc.json.id}/emit`, { token: T, body: {} });
@@ -256,8 +258,9 @@ await shot("05-card-sessao", async () => { await go("/agenda", { view: "dia" });
 const jThu = appts.jul.find((a) => new Date(a.starts_at) > new Date(at(0, 3, "00:00")));
 await shot("06-atendimento", async () => {
   await go(`/pacientes/${pid.jul}/atendimento/${jThu.id}`); await settle();
-  const ta = page.locator("textarea").first();
-  await ta.click(); await ta.pressSequentially("Paciente relata semana produtiva e apenas um episódio de ansiedade, manejado com a respiração. ", { delay: 2 });
+  const ta = page.locator("#pr-conteudo");
+  if (await ta.count()) await ta.pressSequentially("Paciente relata semana produtiva e apenas um episódio de ansiedade, manejado com a respiração. ", { delay: 2, timeout: 10000 }).catch((e) => console.log("   (texto)", e.message.split("\n")[0]));
+  else console.log("   sem #pr-conteudo; botões:", (await page.locator("button").allInnerTexts()).join(" | ").slice(0, 400));
 }, { full: true });
 await shot("07-pacientes", () => go("/pacientes"));
 await shot("08-paciente-dados-lucas", () => go(`/pacientes/${pid.luc}`), { full: true });
@@ -277,7 +280,7 @@ await shot("16-novo-paciente-cep", async () => {
   await page.getByLabel(/número/i).first().fill("1578").catch(() => {});
 }, { full: true });
 await shot("17-financeiro", () => go("/financeiro"), { full: true });
-await shot("18-financeiro-resumo", async () => { await go("/financeiro"); await settle(); await page.getByRole("tab", { name: "Resumo" }).click(); }, { full: true });
+await shot("18-financeiro-resumo", async () => { await go("/financeiro", { token: adminTok }); await settle(); await page.getByRole("tab", { name: "Resumo" }).click(); }, { full: true });
 await shot("19-documentos", () => go("/documentos"));
 await shot("20-politicas", () => go("/politicas"));
 await shot("21-links", () => go("/links"));
