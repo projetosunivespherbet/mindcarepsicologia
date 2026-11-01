@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
-import { api, errMsg } from "@/lib/api";
+import { ApiError, api, errMsg } from "@/lib/api";
 import { addDays, addMinutes, dayKey, dayLabel, hhmm, localInstant, minutesBetween, timeInput, toDateStr, weekStart } from "@/lib/dates";
 import { brl, centsToInput, parseBRL } from "@/lib/money";
 import { MiniCalendar, monthGridRange } from "@/components/MiniCalendar";
