@@ -52,6 +52,7 @@ for (let i = 0; i < 60; i++) {
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".ico": "image/x-icon", ".png": "image/png", ".woff2": "font/woff2" };
 http.createServer((req, res) => {
   const u = new URL(req.url, BASE);
+  if (u.pathname === "/__blank") { res.writeHead(200, { "Content-Type": "text/html" }); return res.end("<html></html>"); }
   let f = path.join(dist, decodeURIComponent(u.pathname));
   if (!f.startsWith(dist) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) f = path.join(dist, "index.html");
   res.writeHead(200, { "Content-Type": MIME[path.extname(f)] ?? "application/octet-stream" });
@@ -84,10 +85,11 @@ function cns() {
   }
 }
 
-// "Agora" fictício: quinta-feira desta semana (ou da próxima, se já passou), 10h40 em São Paulo.
+// "Agora" fictício: a quinta-feira 10h40 (São Paulo) mais recente que já passou.
 const nowSP = new Date(Date.now() - 3 * 3600e3);
 const dow = (nowSP.getUTCDay() + 6) % 7; // 0 = segunda
-const mondayUTC = Date.UTC(nowSP.getUTCFullYear(), nowSP.getUTCMonth(), nowSP.getUTCDate() - dow + (dow >= 3 ? 7 : 0));
+let mondayUTC = Date.UTC(nowSP.getUTCFullYear(), nowSP.getUTCMonth(), nowSP.getUTCDate() - dow);
+if (new Date(new Date(mondayUTC + 3 * 86400e3).toISOString().slice(0, 10) + "T10:40:00-03:00") > new Date()) mondayUTC -= 7 * 86400e3;
 const dayStr = (weekOffset, wd) => new Date(mondayUTC + (weekOffset * 7 + wd) * 86400e3).toISOString().slice(0, 10);
 const at = (weekOffset, wd, hhmm) => `${dayStr(weekOffset, wd)}T${hhmm}:00-03:00`;
 const FAKE_NOW = new Date(at(0, 3, "10:40"));
@@ -122,6 +124,12 @@ const P = [
   { k: "gus", nome: "Gustavo Pires", nasc: "1988-02-17", tel: "11932109876", wd: 2, h: "18:00" },
   { k: "cam", nome: "Camila Souza", nasc: "2000-05-21", tel: "11921098765", wd: 3, h: "15:00" },
   { k: "thi", nome: "Thiago Nascimento", nasc: "1995-12-09", tel: "11910987654", wd: 4, h: "11:00" },
+  { k: "ana", nome: "Ana Clara Moreira", nasc: "1997-07-07", tel: "11998877665", wd: 0, h: "10:00" },
+  { k: "bru", nome: "Bruno Carvalho", nasc: "1982-10-19", tel: "11988776655", wd: 1, h: "08:00" },
+  { k: "dan", nome: "Daniela Freitas", nasc: "1990-02-11", tel: "11977665544", wd: 2, h: "14:00" },
+  { k: "fel", nome: "Felipe Barros", nasc: "1994-04-04", tel: "11966554433", wd: 3, h: "08:00" },
+  { k: "isa", nome: "Isabela Duarte", nasc: "2002-09-15", tel: "11955443322", wd: 4, h: "09:00" },
+  { k: "mar", nome: "Marcos Vieira", nasc: "1976-12-01", tel: "11944332211", wd: 1, h: "19:00" },
   { k: "pat", nome: "Patrícia Lima", nasc: "1983-03-28", tel: "11909876543", wd: 4, h: "14:00", sumiu: true },
 ];
 const pid = {};
@@ -139,7 +147,8 @@ await call("PATCH", `/patients/${pid.luc}`, { token: T, body: { observacoes: "Ve
 await call("PUT", `/patients/${pid.jul}/anamnesis`, { token: T, body: { queixa_principal: "Ansiedade e dificuldade para dormir em períodos de muita demanda no trabalho.", medicamentos: "Nenhum" } });
 
 // pacote para o Lucas
-await call("POST", "/packages", { token: T, body: { patient_id: pid.luc, sessoes: 8, valor_centavos: 128000, vencimento: dayStr(-7, 0) } });
+const pac = (await call("POST", "/packages", { token: T, body: { patient_id: pid.luc, sessoes: 8, valor_centavos: 128000, vencimento: dayStr(-7, 0) } })).json;
+if (pac?.charge_id) await call("POST", `/charges/${pac.charge_id}/payments`, { token: T, headers: { "Idempotency-Key": "shots-pacote-xxxxxxxx" }, body: { valor_centavos: 128000, metodo: "transferencia" } });
 
 // agenda: semanal, 7 semanas para trás até 2 à frente
 const appts = {}; // k -> [{id, starts_at}]
@@ -167,6 +176,7 @@ for (const p of P) {
   for (const [idx, a] of appts[p.k].entries()) {
     const when = new Date(a.starts_at);
     if (when >= FAKE_NOW) continue;
+    if (p.k === "jul" && FAKE_NOW - when < 3600e3) continue; // sessão em andamento agora
     // algumas exceções para a agenda parecer real
     if (p.k === "edu" && when > new Date(at(0, 0, "00:00"))) { await call("PATCH", `/appointments/${a.id}`, { token: T, body: { status: "cancelado" } }); continue; }
     if (p.k === "fer" && idx === 6) { await call("PATCH", `/appointments/${a.id}`, { token: T, body: { status: "faltou" } }); continue; }
@@ -175,7 +185,9 @@ for (const p of P) {
     if (p.k === "luc") await call("POST", "/packages/use", { token: T, body: { appointment_id: a.id } });
     else ch = (await call("POST", "/charges", { token: T, body: { patient_id: pid[p.k], appointment_id: a.id, vencimento: when.toISOString().slice(0, 10) } })).json;
     if (ch?.id) charges.push({ id: ch.id, k: p.k, when });
-    if (p.k === "jul") {
+    if (p.k !== "jul") {
+      await call("PUT", `/appointments/${a.id}/record`, { token: T, body: { conteudo: "Sessão realizada conforme o plano terapêutico. Registro fictício para demonstração." } });
+    } else {
       await call("PUT", `/appointments/${a.id}/record`, { token: T, body: { conteudo: REG[rec % REG.length], anotacoes: rec === 3 ? "Hipótese: perfeccionismo como fator de manutenção. Investigar histórico escolar." : undefined } });
       await owner.query("UPDATE session_records SET created_at = $2, updated_at = $2 WHERE appointment_id = $1", [a.id, plus50(a.starts_at)]).catch((e) => console.log("  ! records", e.message));
       rec++;
@@ -204,7 +216,7 @@ for (const [i, a] of jPast.entries()) {
   for (const [g, n] of [[g1, notas1], [g2, notas2], [g3, notas3]]) {
     if (i === 0 && g === g3) continue;
     const r = await call("POST", `/goals/${g.id}/progress`, { token: T, body: { nota: n[Math.min(i, n.length - 1)], appointment_id: a.id } });
-    if (r.json?.id) await owner.query("UPDATE goal_progress SET created_at = $2 WHERE id = $1", [r.json.id, plus50(a.starts_at)]);
+    await owner.query("UPDATE goal_progress SET created_at = $2 WHERE goal_id = $1 AND appointment_id = $3", [g.id, plus50(a.starts_at), a.id]);
   }
 }
 const phq = [[2, 2, 2, 2, 1, 2, 2, 1, 0], [2, 2, 1, 2, 1, 1, 1, 1, 0], [1, 1, 1, 1, 1, 1, 1, 0, 0], [1, 1, 0, 1, 0, 1, 0, 0, 0]];
@@ -228,7 +240,7 @@ if (doc.json?.id) await call("POST", `/documents/${doc.json.id}/emit`, { token: 
 await call("POST", "/documents", { token: T, body: { patient_id: pid.jul, tipo: "declaracao", finalidade: "Comprovação junto ao empregador", conteudo: { registro: "Compareceu a atendimento psicológico." } } });
 
 // ---------- capturas
-const browser = await chromium.launch();
+const browser = await chromium.launch({ args: ["--lang=pt-BR"], env: { ...process.env, LANG: "pt_BR.UTF-8", LANGUAGE: "pt_BR" } });
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1.5, locale: "pt-BR", timezoneId: "America/Sao_Paulo" });
 await ctx.addInitScript(({ now }) => {
   const Real = Date; const off = now - Real.now();
@@ -245,17 +257,18 @@ const shot = async (name, fn, opts = {}) => {
   catch (e) { console.log("  ✗", name, e.message.split("\n")[0]); await page.screenshot({ path: path.join(OUT, `ERRO-${name}.png`) }).catch(() => {}); }
 };
 const go = async (p, { token = T, view } = {}) => {
-  await page.goto(BASE + "/entrar");
+  await page.goto(BASE + "/__blank");
   await page.evaluate(({ token, view }) => { localStorage.clear(); if (token) localStorage.setItem("mindcare.token", token); if (view) localStorage.setItem("agenda-view", view); }, { token, view });
   await page.goto(BASE + p);
 };
 
 await shot("01-login", async () => { await go("/entrar", { token: null }); await page.locator("input[type=email]").first().fill("marina@clinicaexemplo.test"); await page.locator("input[type=password]").first().fill("Senha@1234"); });
-await shot("02-agenda-semana", () => go("/agenda", { view: "grade" }));
-await shot("03-agenda-dia", () => go("/agenda", { view: "dia" }));
+await shot("02-agenda-semana", () => go("/agenda", { view: "grade" }), { full: true });
+await shot("03-agenda-dia", () => go("/agenda", { view: "dia" }), { full: true });
 await shot("04-agenda-lista", () => go("/agenda", { view: "lista" }));
 await shot("05-card-sessao", async () => { await go("/agenda", { view: "dia" }); await settle(); await page.getByText("Juliana Ferreira").first().click(); });
 const jThu = appts.jul.find((a) => new Date(a.starts_at) > new Date(at(0, 3, "00:00")));
+console.log("sessão de hoje da Juliana:", jThu?.id, jThu?.starts_at);
 await shot("06-atendimento", async () => {
   await go(`/pacientes/${pid.jul}/atendimento/${jThu.id}`); await settle();
   const ta = page.locator("#pr-conteudo");
@@ -271,7 +284,7 @@ await shot("11-prontuario", tab("Prontuário"), { full: true });
 await shot("12-plano-terapeutico", tab("Plano terapêutico"), { full: true });
 await shot("13-escalas", tab("Escalas"), { full: true });
 await shot("14-cobrancas-paciente", tab("Cobranças"), { full: true });
-await shot("15-cobranca-pix", async () => { await tab("Cobranças")(); await settle(); await page.getByText(/em aberto|pendente|vencid/i).first().click(); });
+await shot("15-cobranca-pix", async () => { await tab("Cobranças")(); await settle(); await page.getByText(/^\d{2}\/\d{4} · R\$/).first().click(); });
 await shot("16-novo-paciente-cep", async () => {
   await go("/pacientes/novo"); await settle();
   await page.getByLabel(/nome/i).first().fill("Mariana Teixeira").catch(() => {});
