@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, FilePlus2 } from "lucide-react";
 import { toast } from "sonner";
@@ -29,31 +29,33 @@ const ANAMNESIS_FIELDS: { key: keyof Anamnesis; label: string }[] = [
   { key: "expectativas", label: "Expectativas" },
 ];
 
-function DataForm({ patient }: { patient: PatientDetailType }) {
+/** Formulário completo do paciente: sem `patient`, cadastra um novo e abre a ficha; com `patient`, edita. */
+export function DataForm({ patient }: { patient?: PatientDetailType }) {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const qc = useQueryClient();
   const [f, setF] = useState({
-    nome: patient.nome,
-    cpf: patient.cpf ?? "",
-    cns: patient.cns ?? "",
-    endereco: patient.endereco ?? "",
-    responsavel_nome: patient.responsavel_nome ?? "",
-    responsavel_cpf: patient.responsavel_cpf ?? "",
-    responsavel_vinculo: patient.responsavel_vinculo ?? "",
-    responsavel_telefone: patient.responsavel_telefone ?? "",
-    data_nascimento: patient.data_nascimento ?? "",
-    telefone: patient.telefone ?? "",
-    email: patient.email ?? "",
-    genero: patient.genero ?? "",
-    estado_civil: patient.estado_civil ?? "",
-    profissao: patient.profissao ?? "",
-    professional_id: patient.professional_id ?? "",
-    ativo: patient.ativo,
+    nome: patient?.nome ?? "",
+    cpf: patient?.cpf ?? "",
+    cns: patient?.cns ?? "",
+    endereco: patient?.endereco ?? "",
+    responsavel_nome: patient?.responsavel_nome ?? "",
+    responsavel_cpf: patient?.responsavel_cpf ?? "",
+    responsavel_vinculo: patient?.responsavel_vinculo ?? "",
+    responsavel_telefone: patient?.responsavel_telefone ?? "",
+    data_nascimento: patient?.data_nascimento ?? "",
+    telefone: patient?.telefone ?? "",
+    email: patient?.email ?? "",
+    genero: patient?.genero ?? "",
+    estado_civil: patient?.estado_civil ?? "",
+    profissao: patient?.profissao ?? "",
+    professional_id: patient?.professional_id ?? "",
+    ativo: patient?.ativo ?? true,
   });
   const save = useMutation({
     mutationFn: () =>
-      api(`/patients/${patient.id}`, {
-        method: "PATCH",
+      api<PatientDetailType>(patient ? `/patients/${patient.id}` : "/patients", {
+        method: patient ? "PATCH" : "POST",
         body: {
           nome: f.nome,
           cpf: f.cpf.trim() || null,
@@ -69,14 +71,20 @@ function DataForm({ patient }: { patient: PatientDetailType }) {
           genero: f.genero || null,
           estado_civil: f.estado_civil || null,
           profissao: f.profissao || null,
-          ativo: f.ativo,
+          ...(patient ? { ativo: f.ativo } : {}),
           ...(user?.role === "psicologo" ? {} : { professional_id: f.professional_id || null }),
         },
       }),
-    onSuccess: () => {
+    onSuccess: (salvo) => {
+      void qc.invalidateQueries({ queryKey: ["patients"] });
+      void qc.invalidateQueries({ queryKey: ["patients-all"] });
+      if (!patient) {
+        toast.success("Paciente cadastrado");
+        navigate(`/pacientes/${salvo.id}`);
+        return;
+      }
       toast.success("Dados salvos");
       void qc.invalidateQueries({ queryKey: ["patient", patient.id] });
-      void qc.invalidateQueries({ queryKey: ["patients"] });
     },
     onError: (e) => toast.error(errMsg(e)),
   });
@@ -87,6 +95,7 @@ function DataForm({ patient }: { patient: PatientDetailType }) {
   };
   return (
     <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
+      <h3 className="text-sm font-semibold text-muted-foreground sm:col-span-2">Identificação</h3>
       <div className="space-y-2 sm:col-span-2">
         <Label htmlFor="d-nome">Nome completo</Label>
         <Input id="d-nome" required value={f.nome} onChange={set("nome")} />
@@ -103,6 +112,7 @@ function DataForm({ patient }: { patient: PatientDetailType }) {
         <Label htmlFor="d-nasc">Nascimento</Label>
         <Input id="d-nasc" type="date" value={f.data_nascimento} onChange={set("data_nascimento")} />
       </div>
+      <h3 className="pt-2 text-sm font-semibold text-muted-foreground sm:col-span-2">Endereço e contato</h3>
       <div className="space-y-2 sm:col-span-2">
         <AddressInput id="d-end" value={f.endereco} onChange={(v) => setF({ ...f, endereco: v })} />
       </div>
@@ -114,6 +124,7 @@ function DataForm({ patient }: { patient: PatientDetailType }) {
         <Label htmlFor="d-email">E-mail</Label>
         <Input id="d-email" type="email" value={f.email} onChange={set("email")} />
       </div>
+      <h3 className="pt-2 text-sm font-semibold text-muted-foreground sm:col-span-2">Dados complementares</h3>
       <div className="space-y-2">
         <Label htmlFor="d-gen">Gênero</Label>
         <Input id="d-gen" value={f.genero} onChange={set("genero")} />
@@ -158,14 +169,21 @@ function DataForm({ patient }: { patient: PatientDetailType }) {
           <ProfessionalSelect id="d-resp" value={f.professional_id} onChange={(v) => setF({ ...f, professional_id: v })} />
         </div>
       )}
-      <div className="flex items-center gap-3 sm:col-span-2">
-        <Switch id="d-ativo" checked={f.ativo} onCheckedChange={(v) => setF({ ...f, ativo: v })} />
-        <Label htmlFor="d-ativo">Paciente ativo</Label>
-      </div>
-      <div className="sm:col-span-2">
+      {patient && (
+        <div className="flex items-center gap-3 sm:col-span-2">
+          <Switch id="d-ativo" checked={f.ativo} onCheckedChange={(v) => setF({ ...f, ativo: v })} />
+          <Label htmlFor="d-ativo">Paciente ativo</Label>
+        </div>
+      )}
+      <div className="flex gap-2 sm:col-span-2">
         <Button type="submit" disabled={save.isPending}>
-          {save.isPending ? "Salvando..." : "Salvar dados"}
+          {save.isPending ? "Salvando..." : patient ? "Salvar dados" : "Cadastrar paciente"}
         </Button>
+        {!patient && (
+          <Button asChild type="button" variant="outline">
+            <Link to="/pacientes">Cancelar</Link>
+          </Button>
+        )}
       </div>
     </form>
   );

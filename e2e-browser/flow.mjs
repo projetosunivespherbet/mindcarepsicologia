@@ -215,8 +215,8 @@ await step("admin cria papel timbrado com imagem de fundo (upload e redução no
 
 await step("psicólogo cadastra paciente e salva a anamnese", async () => {
   await click(psi, aria("Novo paciente", "button"));
-  await fill(psi, "#p-nome", "Maria de Souza Navegador");
-  await click(psi, aria("Cadastrar", "button"));
+  await fill(psi, "#d-nome", "Maria de Souza Navegador");
+  await click(psi, aria("Cadastrar paciente", "button"));
   await psi.waitForSelector("::-p-text(Paciente ativo)", { timeout: T });
   await click(psi, aria("Anamnese", "tab"));
   await fill(psi, "#a-queixa_principal", "Ansiedade e dificuldade para dormir.");

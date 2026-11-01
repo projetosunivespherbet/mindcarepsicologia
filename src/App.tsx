@@ -18,6 +18,7 @@ import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import PatientDetail from "./pages/PatientDetail";
 import Atendimento from "./pages/Atendimento";
+import PatientNew from "./pages/PatientNew";
 import Patients from "./pages/Patients";
 import Users from "./pages/Users";
 import VerifyDocument from "./pages/VerifyDocument";
@@ -63,6 +64,7 @@ function AppRoutes() {
       >
         <Route path="/" element={<Navigate to="/pacientes" replace />} />
         <Route path="/pacientes" element={<Patients />} />
+        <Route path="/pacientes/novo" element={<PatientNew />} />
         <Route path="/pacientes/:id" element={<PatientDetail />} />
         <Route path="/pacientes/:id/atendimento/:sessao" element={<Atendimento />} />
         <Route path="/documentos" element={<Guard allow={canDocs}><DocumentList /></Guard>} />
