@@ -267,7 +267,7 @@ export default function Finance() {
 
         {role !== "psicologo" && (
         <TabsContent value="resumo" className="space-y-4">
-      {role !== "psicologo" && (summary.data?.por_profissional.length ?? 0) > 0 && (
+      {(summary.data?.por_profissional.length ?? 0) > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Por profissional</CardTitle>
