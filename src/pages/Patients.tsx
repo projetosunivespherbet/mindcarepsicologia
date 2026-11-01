@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { api, errMsg } from "@/lib/api";
 import type { Patient, Professional } from "@/lib/types";
+import { AddressInput } from "@/components/AddressInput";
 
 export const formatBirth = (d: string | null) => (d ? d.split("-").reverse().join("/") : "—");
 
@@ -159,8 +160,7 @@ export default function Patients() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="p-end">Endereço</Label>
-              <Input id="p-end" maxLength={300} placeholder="Rua, número, bairro, cidade/UF" value={form.endereco} onChange={(e) => setForm({ ...form, endereco: e.target.value })} />
+              <AddressInput id="p-end" value={form.endereco} onChange={(v) => setForm({ ...form, endereco: v })} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="p-email">E-mail</Label>

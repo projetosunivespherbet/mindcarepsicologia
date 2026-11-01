@@ -7,6 +7,7 @@ import { DocStatusBadge } from "@/components/DocStatusBadge";
 import { PatientCharges } from "@/components/PatientCharges";
 import { PatientPackages } from "@/components/PatientPackages";
 import { PatientRecords } from "@/components/PatientRecords";
+import { AddressInput } from "@/components/AddressInput";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -103,8 +104,7 @@ function DataForm({ patient }: { patient: PatientDetailType }) {
         <Input id="d-nasc" type="date" value={f.data_nascimento} onChange={set("data_nascimento")} />
       </div>
       <div className="space-y-2 sm:col-span-2">
-        <Label htmlFor="d-end">Endereço</Label>
-        <Input id="d-end" maxLength={300} placeholder="Rua, número, bairro, cidade/UF" value={f.endereco} onChange={set("endereco")} />
+        <AddressInput id="d-end" value={f.endereco} onChange={(v) => setF({ ...f, endereco: v })} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="d-tel">Telefone</Label>
