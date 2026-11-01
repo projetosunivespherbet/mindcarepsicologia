@@ -607,3 +607,98 @@ finance.get("/export", requireRole("admin"), async (c) => {
     "Cache-Control": "no-store",
   });
 });
+
+// ---------------------------------------------------------------- Receita Saúde (arquivo de lote para o Carnê-Leão)
+// Layout do Manual do Receita Saúde 2.1 (pergunta 24): CSV com ";", até 1.000 linhas, todos os pagamentos do mesmo ano.
+// Cada linha vira um recibo do profissional. Só entram pagamentos recebidos pelo próprio profissional, de pessoa física,
+// sem estorno e fora de convênio. O envio ao e-CAC é feito pelo profissional: o MindCare só gera o arquivo.
+const RS_MAX_LINHAS = 1000;
+const RS_OCUPACAO_PSICOLOGO = "255";
+// Colunas "sempre vazias" entre o CPF do beneficiário e o indicador de recibo (S): a tabela do manual lista 4
+// (CPF não informado, CNPJ, indicador de IRRF, valor do IRRF), mas a linha de exemplo do manual mostra 3.
+// Se a análise do e-CAC reclamar de deslocamento de colunas, ajuste só este número.
+const RS_VAZIOS = 4;
+
+/** Uma linha do lote: data;rendimento;ocupação;valor;dedução;descrição;PF;CPF pagador;CPF beneficiário;4 vazios;S;CPF profissional;registro. */
+export function receitaSaudeLine(l: { data: string; valor_centavos: number; descricao: string; cpf_pagador: string; cpf_beneficiario: string; cpf_profissional: string; registro: string }) {
+  const [y, m, d] = l.data.split("-");
+  return [`${d}/${m}/${y}`, "R01.001.001", RS_OCUPACAO_PSICOLOGO, csvMoney(l.valor_centavos), "", l.descricao, "PF", l.cpf_pagador, l.cpf_beneficiario, ...Array<string>(RS_VAZIOS).fill(""), "S", l.cpf_profissional, l.registro].join(";");
+}
+
+finance.get("/receita-saude", requireRole("admin", "psicologo"), async (c) => {
+  const s = c.get("session");
+  const q = readQuery(c, z.object({ month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Informe o mês como AAAA-MM"), professional_id: z.uuid().optional() }));
+  const professionalId = s.role === "psicologo" ? s.userId : q.professional_id;
+  if (!professionalId) throw new HTTPException(400, { message: "Escolha o psicólogo" });
+  const from = `${q.month}-01`;
+
+  const { prof, rows } = await withSession(c.get("pool"), s, async (db) => {
+    const prof = (await db.query("SELECT id, nome, cpf, crp FROM users WHERE id = $1 AND atende", [professionalId])).rows[0];
+    if (!prof) throw notFound("Psicólogo");
+    const r = await db.query(
+      `SELECT pg.id AS payment_id, pg.pago_em::text AS data, pg.valor_centavos, pt.nome AS paciente, pt.cpf AS cpf_paciente,
+              py.nome AS pagador, py.cpf_cnpj AS doc_pagador, (ch.payer_id IS NULL) AS pagador_e_paciente, ap.starts_at AS sessao_em,
+              to_char(ap.starts_at AT TIME ZONE cl.timezone, 'DD/MM/YY') AS sessao_dia
+         FROM payments pg
+         JOIN charges ch ON ch.id = pg.charge_id
+         JOIN patients pt ON pt.id = ch.patient_id
+         JOIN clinics cl ON cl.id = ch.clinic_id
+         LEFT JOIN payers py ON py.id = ch.payer_id
+         LEFT JOIN appointments ap ON ap.id = ch.appointment_id
+        WHERE ch.professional_id = $1
+          AND pg.reverses_id IS NULL
+          AND NOT EXISTS (SELECT 1 FROM payments r WHERE r.reverses_id = pg.id)
+          AND pg.recebido_por = 'profissional' AND pg.metodo <> 'convenio' AND NOT ch.convenio
+          AND (ap.id IS NULL OR ap.atendimento = 'particular')
+          AND pg.pago_em >= $2::date AND pg.pago_em < ($2::date + interval '1 month')
+        ORDER BY pg.pago_em, pg.created_at LIMIT 5000`,
+      [professionalId, from],
+    );
+    await audit(db, s, "finance.receita_saude", "payment", null);
+    return { prof, rows: r.rows };
+  });
+
+  const avisosProf: string[] = [];
+  if (!prof.cpf) avisosProf.push("O CPF do psicólogo não está cadastrado (a administração informa em Usuários > Editar)");
+  if (prof.crp && String(prof.crp).length > 15) avisosProf.push("O CRP tem mais de 15 caracteres (limite do arquivo)");
+
+  const linhas = rows.map((r: any) => {
+    const problemas: string[] = [];
+    const cpfPagador = r.pagador_e_paciente ? r.cpf_paciente : r.doc_pagador && String(r.doc_pagador).length === 11 ? r.doc_pagador : null;
+    if (!r.cpf_paciente) problemas.push("Paciente sem CPF");
+    if (!r.pagador_e_paciente && !r.doc_pagador) problemas.push("Responsável financeiro sem CPF");
+    if (!r.pagador_e_paciente && r.doc_pagador && String(r.doc_pagador).length !== 11) problemas.push("Pagador é pessoa jurídica (o recibo é só para pessoa física)");
+    const descricao = r.sessao_dia ? `Sessão de psicologia realizada em ${r.sessao_dia}` : "Atendimento psicológico";
+    return {
+      payment_id: r.payment_id as string,
+      data: r.data as string,
+      valor_centavos: r.valor_centavos as number,
+      paciente: r.paciente as string,
+      pagador: (r.pagador_e_paciente ? r.paciente : r.pagador) as string,
+      problemas,
+      csv: problemas.length || avisosProf.length
+        ? null
+        : receitaSaudeLine({ data: r.data, valor_centavos: r.valor_centavos, descricao, cpf_pagador: cpfPagador, cpf_beneficiario: r.cpf_paciente, cpf_profissional: prof.cpf, registro: prof.crp ?? "" }),
+    };
+  });
+
+  const prontas = linhas.filter((l) => l.csv !== null).map((l) => l.csv as string);
+  const arquivos = [];
+  for (let i = 0; i < prontas.length; i += RS_MAX_LINHAS) {
+    const parte = prontas.slice(i, i + RS_MAX_LINHAS);
+    arquivos.push({ nome: `receita-saude-${q.month}-parte${arquivos.length + 1}.csv`, linhas: parte.length, csv: `${parte.join("\r\n")}\r\n` });
+  }
+  return c.json({
+    mes: q.month,
+    profissional: { id: prof.id, nome: prof.nome, crp: prof.crp, cpf_cadastrado: !!prof.cpf },
+    avisos: avisosProf,
+    resumo: {
+      pagamentos: linhas.length,
+      prontos: prontas.length,
+      com_pendencia: linhas.length - prontas.length,
+      total_centavos: linhas.filter((l) => l.csv !== null).reduce((t, l) => t + l.valor_centavos, 0),
+    },
+    linhas: linhas.map(({ csv: _csv, ...resto }) => resto),
+    arquivos,
+  });
+});

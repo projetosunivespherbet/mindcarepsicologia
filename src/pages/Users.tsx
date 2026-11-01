@@ -53,7 +53,7 @@ export default function Users() {
   const users = useQuery({ queryKey: ["users"], queryFn: () => api<AppUser[]>("/users") });
   const [creating, setCreating] = useState(false);
   const [link, setLink] = useState<{ nome: string; invite: InviteLink } | null>(null);
-  const [form, setForm] = useState({ nome: "", role: "psicologo" as Role, crp: "", atende: false, telefone: "", email: "" });
+  const [form, setForm] = useState({ nome: "", role: "psicologo" as Role, crp: "", cpf: "", atende: false, telefone: "", email: "" });
 
   const create = useMutation({
     mutationFn: () =>
@@ -62,6 +62,7 @@ export default function Users() {
           nome: form.nome,
           role: form.role,
           crp: form.crp.trim() || undefined,
+          cpf: form.cpf.trim() || undefined,
           atende: form.role === "admin" ? form.atende : undefined,
           telefone: form.telefone.trim() || undefined,
           email: form.email.trim() || undefined,
@@ -70,7 +71,7 @@ export default function Users() {
     onSuccess: (r) => {
       setCreating(false);
       setLink({ nome: r.user.nome, invite: r.invite });
-      setForm({ nome: "", role: "psicologo", crp: "", atende: false, telefone: "", email: "" });
+      setForm({ nome: "", role: "psicologo", crp: "", cpf: "", atende: false, telefone: "", email: "" });
       void qc.invalidateQueries({ queryKey: ["users"] });
     },
     onError: (e) => toast.error(errMsg(e)),
@@ -89,9 +90,9 @@ export default function Users() {
   });
 
   const [editing, setEditing] = useState<AppUser | null>(null);
-  const [eform, setEform] = useState({ nome: "", role: "psicologo" as Role, crp: "", atende: false, telefone: "" });
+  const [eform, setEform] = useState({ nome: "", role: "psicologo" as Role, crp: "", cpf: "", atende: false, telefone: "" });
   const openEdit = (u: AppUser) => {
-    setEform({ nome: u.nome, role: u.role, crp: u.crp ?? "", atende: u.atende, telefone: u.telefone ?? "" });
+    setEform({ nome: u.nome, role: u.role, crp: u.crp ?? "", cpf: u.cpf ?? "", atende: u.atende, telefone: u.telefone ?? "" });
     setEditing(u);
   };
   const eAtende = eform.role === "admin" ? eform.atende : eform.role === "psicologo";
@@ -103,6 +104,7 @@ export default function Users() {
           nome: eform.nome.trim(),
           role: eform.role,
           crp: eform.crp.trim() || null,
+          cpf: eform.cpf.trim() || null,
           atende: eAtende,
           telefone: eform.telefone.trim() || null,
         },
@@ -229,10 +231,17 @@ export default function Users() {
               </div>
             )}
             {needsCrp && (
+              <>
               <div className="space-y-2">
                 <Label htmlFor="u-crp">CRP</Label>
                 <Input id="u-crp" required placeholder="06/123456" value={form.crp} onChange={(e) => setForm({ ...form, crp: e.target.value })} />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="u-cpf">CPF (opcional)</Label>
+                <Input id="u-cpf" inputMode="numeric" placeholder="000.000.000-00" value={form.cpf} onChange={(e) => setForm({ ...form, cpf: e.target.value })} />
+                <p className="text-xs text-muted-foreground">Necessário para gerar o arquivo do Receita Saúde.</p>
+              </div>
+              </>
             )}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
@@ -293,6 +302,13 @@ export default function Users() {
               <div className="space-y-2">
                 <Label htmlFor="e-crp">CRP</Label>
                 <Input id="e-crp" required placeholder="06/123456" value={eform.crp} onChange={(e) => setEform({ ...eform, crp: e.target.value })} />
+              </div>
+            )}
+            {eAtende && (
+              <div className="space-y-2">
+                <Label htmlFor="e-cpf">CPF (opcional)</Label>
+                <Input id="e-cpf" inputMode="numeric" placeholder="000.000.000-00" value={eform.cpf} onChange={(e) => setEform({ ...eform, cpf: e.target.value })} />
+                <p className="text-xs text-muted-foreground">Necessário para gerar o arquivo do Receita Saúde.</p>
               </div>
             )}
             <div className="space-y-2">

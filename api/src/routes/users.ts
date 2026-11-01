@@ -5,9 +5,9 @@ import { audit, withSession, type DbClient, type Session } from "../db";
 import { requireAuth, requireRole } from "../middleware";
 import { randomToken, sha256Hex } from "../security";
 import type { AppEnv } from "../types";
-import { emailSchema, nameSchema, optText, readBody, roleSchema } from "../validation";
+import { cpfSchema, emailSchema, nameSchema, optText, readBody, roleSchema } from "../validation";
 
-const COLS = "id, nome, email, role, crp, atende, telefone, status, last_login_at, created_at";
+const COLS = "id, nome, email, role, crp, cpf, atende, telefone, status, last_login_at, created_at";
 
 async function createInvite(db: DbClient, s: Session, userId: string, kind: "convite" | "redefinicao", days: number, appUrl: string) {
   await db.query("UPDATE invites SET revoked_at = now() WHERE user_id = $1 AND used_at IS NULL AND revoked_at IS NULL", [userId]);
@@ -41,6 +41,7 @@ users.post("/", async (c) => {
       nome: nameSchema,
       role: roleSchema,
       crp: optText(30),
+      cpf: cpfSchema.optional().nullable(),
       atende: z.boolean().optional(),
       telefone: optText(30),
       email: emailSchema.optional(),
@@ -52,9 +53,9 @@ users.post("/", async (c) => {
 
   const result = await withSession(c.get("pool"), s, async (db) => {
     const r = await db.query(
-      `INSERT INTO users (clinic_id, nome, email, role, crp, atende, telefone, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'convidado') RETURNING ${COLS}`,
-      [s.clinicId, body.nome, body.email ?? null, body.role, body.crp ?? null, atende, body.telefone ?? null],
+      `INSERT INTO users (clinic_id, nome, email, role, crp, atende, telefone, status, cpf)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'convidado', $8) RETURNING ${COLS}`,
+      [s.clinicId, body.nome, body.email ?? null, body.role, body.crp ?? null, atende, body.telefone ?? null, body.cpf ?? null],
     );
     const user = r.rows[0];
     await audit(db, s, "user.create", "user", user.id);
@@ -72,6 +73,7 @@ users.patch("/:id", async (c) => {
       nome: nameSchema,
       role: roleSchema,
       crp: optText(30),
+      cpf: cpfSchema.nullable(),
       atende: z.boolean(),
       telefone: optText(30),
       status: z.enum(["ativo", "inativo"]),

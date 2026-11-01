@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
 import { NoteBadge } from "@/components/NoteBadge";
+import { ReceitaSaudeCard } from "@/components/ReceitaSaudeCard";
 import { DetailDialog, ReceiveDialog } from "@/components/PatientCharges";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -235,6 +236,8 @@ export default function Finance() {
           </CardContent>
         </Card>
       )}
+
+      {(role === "admin" || role === "psicologo") && <ReceitaSaudeCard ym={ym} />}
 
       <Card>
         <CardHeader>

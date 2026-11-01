@@ -39,6 +39,7 @@ export interface AppUser {
   email: string | null;
   role: Role;
   crp: string | null;
+  cpf: string | null;
   atende: boolean;
   telefone: string | null;
   status: "convidado" | "ativo" | "inativo";
