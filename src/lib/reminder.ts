@@ -27,7 +27,7 @@ export function reminderText(o: { paciente: string; clinica: string; starts_at: 
 
 export const whatsappUrl = (numero: string, texto: string) => `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
 
-const icsEscape = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+const icsEscape = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
 
 /** Arquivo .ics de um evento (abre no Google Agenda, Apple e Outlook). */
 export function icsContent(o: { id: string; clinica: string; starts_at: string; ends_at: string; now?: Date }) {

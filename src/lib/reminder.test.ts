@@ -30,7 +30,7 @@ describe("lembrete de sessão", () => {
     expect(ics.startsWith("BEGIN:VCALENDAR\r\n")).toBe(true);
     expect(ics).toContain("DTSTART:20300304T120000Z");
     expect(ics).toContain("DTEND:20300304T125000Z");
-    expect(ics).toContain("SUMMARY:Sessão – Clínica\; Bem\\, Estar");
+    expect(ics).toContain("SUMMARY:Sessão – Clínica\\; Bem\\, Estar");
     expect(ics.trimEnd().endsWith("END:VCALENDAR")).toBe(true);
   });
 });
