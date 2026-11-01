@@ -325,6 +325,30 @@ function FlagToggles({ charge }: { charge: ChargeDetail }) {
 
 type Action = { kind: "reverse"; paymentId: string } | { kind: "cancel" } | null;
 
+/** QR Code do Pix, desenhado no navegador a partir do código copia e cola (a chave é a do psicólogo). */
+function PixQr({ code, nome }: { code: string; nome: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    import("qrcode")
+      .then((QR) => QR.toDataURL(code, { margin: 1, width: 240, errorCorrectionLevel: "M" }))
+      .then((u) => vivo && setUrl(u))
+      .catch(() => vivo && setUrl(null));
+    return () => {
+      vivo = false;
+    };
+  }, [code]);
+  if (!url) return null;
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <img src={url} alt="QR Code do Pix" width={200} height={200} className="rounded-md border bg-white p-1" />
+      <a href={url} download={`pix-${nome}.png`} className="text-xs text-primary hover:underline">
+        Baixar QR Code
+      </a>
+    </div>
+  );
+}
+
 /** Pix "copia e cola" do saldo da cobrança, com a chave Pix do psicólogo. O código é gerado aqui, no navegador. */
 function PixBox({ charge }: { charge: ChargeDetail }) {
   const { user } = useAuth();
@@ -353,16 +377,17 @@ function PixBox({ charge }: { charge: ChargeDetail }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">Pix de {brl(charge.saldo_centavos)}</p>
         <Button size="sm" variant="outline" onClick={() => setOpen((o) => !o)}>
-          <QrCode className="w-4 h-4 mr-2" /> {open ? "Ocultar Pix" : "Pix copia e cola"}
+          <QrCode className="w-4 h-4 mr-2" /> {open ? "Ocultar Pix" : "Pix (QR Code e copia e cola)"}
         </Button>
       </div>
       {open && (
         <>
+          <PixQr code={code} nome={(charge.paciente_nome ?? "paciente").split(" ")[0]!} />
           <textarea readOnly rows={4} aria-label="Código Pix copia e cola" className="w-full rounded-md border bg-muted/40 p-2 font-mono text-xs" value={code} onFocus={(e) => e.currentTarget.select()} />
           <Button size="sm" onClick={() => void copiar()}>
             <Copy className="w-4 h-4 mr-2" /> Copiar código
           </Button>
-          <p className="text-xs text-muted-foreground">Envie o código ao paciente. No app do banco: Pix &gt; Pix copia e cola. Depois do pagamento, registre-o em "Receber".</p>
+          <p className="text-xs text-muted-foreground">Mostre o QR Code ou envie o código ao paciente (no app do banco: Pix &gt; Ler QR Code ou Pix copia e cola). Depois do pagamento, registre-o em "Receber".</p>
         </>
       )}
     </div>
