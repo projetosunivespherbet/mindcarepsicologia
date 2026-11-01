@@ -134,7 +134,7 @@ patients.post("/:id/records/export", async (c) => {
       paciente: p,
       profissional: prof ?? null,
       clinica: clinica?.nome ?? "",
-      itens: rows.map((r: { id: string; starts_at: string; ends_at: string; status: string; conteudo: string; anotacoes: string }) => ({
+      itens: rows.map((r) => ({
         appointment_id: r.id,
         starts_at: r.starts_at,
         ends_at: r.ends_at,
