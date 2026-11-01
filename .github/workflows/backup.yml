@@ -1,0 +1,78 @@
+# Cópia diária do banco (Neon), criptografada, guardada como artefato do GitHub por 90 dias.
+# Segredos (Settings > Secrets and variables > Actions):
+#   NEON_BACKUP_URL   string de conexão direta do Neon (sem "-pooler"), do dono do banco
+#   BACKUP_PASSPHRASE frase-senha longa (16+ caracteres) — guarde-a: sem ela a cópia não abre
+# Restaurar: baixe o artefato, depois
+#   gpg --decrypt mindcare-AAAA-MM-DD.dump.gpg > mindcare.dump
+#   pg_restore --no-owner -d "<string de conexão de um banco/branch novo>" mindcare.dump
+name: Backup diário
+on:
+  schedule:
+    - cron: "0 6 * * *" # 03:00 em Brasília
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Confere os segredos
+        env:
+          URL: ${{ secrets.NEON_BACKUP_URL }}
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$PASS" ]; then
+            echo "::error::Cadastre os segredos NEON_BACKUP_URL e BACKUP_PASSPHRASE (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+          if [ "${#PASS}" -lt 16 ]; then
+            echo "::error::BACKUP_PASSPHRASE precisa ter ao menos 16 caracteres."
+            exit 1
+          fi
+
+      - name: Instala o cliente do PostgreSQL 18
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-18
+
+      - name: Exporta, confere e criptografa
+        id: dump
+        env:
+          URL: ${{ secrets.NEON_BACKUP_URL }}
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          BIN=/usr/lib/postgresql/18/bin
+          nome="mindcare-$(TZ=America/Sao_Paulo date +%Y-%m-%d)"
+          mkdir -p out
+          "$BIN/pg_dump" "$URL" --format=custom --compress=9 --file="$nome.dump"
+          # a cópia só vale se der para ler: lista o conteúdo e conta as tabelas com dados
+          tabelas=$("$BIN/pg_restore" --list "$nome.dump" | grep -c "TABLE DATA" || true)
+          if [ "$tabelas" -lt 10 ]; then
+            echo "::error::Cópia suspeita: só $tabelas tabelas com dados."
+            exit 1
+          fi
+          printf '%s' "$PASS" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 --output "out/$nome.dump.gpg" "$nome.dump"
+          shred -u "$nome.dump"
+          echo "nome=$nome" >> "$GITHUB_OUTPUT"
+          echo "Cópia $nome: $tabelas tabelas com dados, $(du -h "out/$nome.dump.gpg" | cut -f1) criptografados." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Guarda a cópia (90 dias)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.dump.outputs.nome }}
+          path: out/*.gpg
+          retention-days: 90
+          if-no-files-found: error
+          compression-level: 0
