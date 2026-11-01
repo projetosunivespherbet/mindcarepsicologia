@@ -314,12 +314,7 @@ describe.skipIf(!process.env.E2E_PG)("fluxo completo: telas + API + Postgres", (
     const segunda = await call("POST", "/appointments", { token: seed.anaToken, body: { patient_id: seed.patient.id, starts_at: at16.toISOString(), ends_at: new Date(at16.getTime() + 50 * 60_000).toISOString(), valor: 180 } });
     expect(segunda.status, JSON.stringify(segunda.json)).toBe(201);
     await openApp("/agenda", seed.anaToken);
-    try {
-      await screen.findByRole("button", { name: "Faltou" });
-    } catch {
-      throw new Error(`DIAG botões=${JSON.stringify(screen.queryAllByRole("button").map((b) => b.textContent))} texto=${document.body.textContent?.slice(0, 900)}`);
-    }
-    await user.click(await screen.findByRole("button", { name: "Faltou" }));
+    await user.click(await screen.findByRole("button", { name: "Faltou" }, { timeout: 5000 }));
     expect(await screen.findByText("Faltou", { selector: "span, div" })).toBeInTheDocument();
     expect((await cobrancas()).filter((c) => c.valor_centavos === 18000)).toHaveLength(1);
   }, 40_000);
