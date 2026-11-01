@@ -38,6 +38,7 @@ export function DataForm({ patient }: { patient?: PatientDetailType }) {
     nome: patient?.nome ?? "",
     cpf: patient?.cpf ?? "",
     cns: patient?.cns ?? "",
+    observacoes: patient?.observacoes ?? "",
     end_cep: patient?.end_cep ?? "",
     end_logradouro: patient?.end_logradouro ?? "",
     end_numero: patient?.end_numero ?? "",
@@ -81,6 +82,7 @@ export function DataForm({ patient }: { patient?: PatientDetailType }) {
           cpf: f.cpf.trim() || null,
           cns: f.cns.trim() || null,
           ...enderecoBody(),
+          observacoes: f.observacoes.trim() || null,
           responsavel_nome: f.responsavel_nome.trim() || null,
           responsavel_cpf: f.responsavel_cpf.trim() || null,
           responsavel_vinculo: f.responsavel_vinculo.trim() || null,
@@ -157,6 +159,10 @@ export function DataForm({ patient }: { patient?: PatientDetailType }) {
       <div className="space-y-2">
         <Label htmlFor="d-prof">Profissão</Label>
         <Input id="d-prof" value={f.profissao} onChange={set("profissao")} />
+      </div>
+      <div className="space-y-2 sm:col-span-2">
+        <Label htmlFor="d-obs">Observações sobre o paciente</Label>
+        <Textarea id="d-obs" rows={3} maxLength={1000} placeholder="Recados abertos à equipe, inclusive à recepção. Conteúdo clínico vai no prontuário." value={f.observacoes} onChange={(e) => setF({ ...f, observacoes: e.target.value })} />
       </div>
       <fieldset className="grid gap-4 rounded-lg border p-3 sm:col-span-2 sm:grid-cols-2">
         <legend className="px-1 text-sm font-medium">Responsável legal (criança, adolescente ou pessoa sob curatela)</legend>

@@ -6,13 +6,14 @@ import { requireAuth } from "../middleware";
 import type { AppEnv } from "../types";
 import { cnsSchema, cpfSchema, emailSchema, nameSchema, optText, readBody, readQuery } from "../validation";
 
-const COLS = "id, nome, cpf, cns, endereco, end_cep, end_logradouro, end_numero, end_complemento, end_bairro, end_cidade, end_uf, responsavel_nome, responsavel_cpf, responsavel_vinculo, responsavel_telefone, data_nascimento::text AS data_nascimento, telefone, email, genero, estado_civil, profissao, professional_id, ativo, created_at, updated_at";
+const COLS = "id, nome, cpf, cns, observacoes, endereco, end_cep, end_logradouro, end_numero, end_complemento, end_bairro, end_cidade, end_uf, responsavel_nome, responsavel_cpf, responsavel_vinculo, responsavel_telefone, data_nascimento::text AS data_nascimento, telefone, email, genero, estado_civil, profissao, professional_id, ativo, created_at, updated_at";
 
 const patientFields = {
   nome: nameSchema,
   cpf: cpfSchema.optional().nullable(),
   cns: cnsSchema.optional().nullable(),
   endereco: optText(300),
+  observacoes: optText(1000),
   end_cep: z.string().trim().transform((s) => s.replace(/\D/g, "")).pipe(z.string().regex(/^\d{8}$/, "CEP inválido")).optional().nullable(),
   end_logradouro: optText(160),
   end_numero: optText(20),

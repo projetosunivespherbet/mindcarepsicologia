@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { ApiError, api, errMsg } from "@/lib/api";
 import { addDays, addMinutes, dayKey, dayLabel, hhmm, localInstant, minutesBetween, timeInput, toDateStr, weekStart } from "@/lib/dates";
@@ -51,7 +50,7 @@ function SessionDialog({
   const { user } = useAuth();
   const qc = useQueryClient();
   const isPsi = user?.role === "psicologo";
-  const blank = () => ({ patient_id: "", professional_id: defaultProfessional, date: defaultDate, time: defaultTime, duracao: "50", valor: "", atendimento: "particular" as Atendimento, repetir: "", observacao: "" });
+  const blank = () => ({ patient_id: "", professional_id: defaultProfessional, date: defaultDate, time: defaultTime, duracao: "50", valor: "", atendimento: "particular" as Atendimento, repetir: "" });
   const [f, setF] = useState(blank);
 
   useEffect(() => {
@@ -66,7 +65,6 @@ function SessionDialog({
         valor: appointment.valor ? centsToInput(Math.round(appointment.valor * 100)) : "",
         atendimento: appointment.atendimento,
         repetir: "",
-        observacao: appointment.observacao ?? "",
       });
     } else setF(blank());
   }, [open, appointment?.id]);
@@ -88,7 +86,7 @@ function SessionDialog({
       }
       const starts_at = localInstant(f.date, f.time);
       const ends_at = addMinutes(starts_at, dur);
-      if (appointment) return api(`/appointments/${appointment.id}`, { method: "PATCH", body: { starts_at, ends_at, valor, atendimento: f.atendimento, observacao: f.observacao.trim() || null } });
+      if (appointment) return api(`/appointments/${appointment.id}`, { method: "PATCH", body: { starts_at, ends_at, valor, atendimento: f.atendimento } });
       if (!f.patient_id) throw new Error("Escolha o paciente");
       if (!isPsi && !f.professional_id) throw new Error("Escolha o psicólogo");
       const n = f.repetir.trim() ? Number(f.repetir) : 1;
@@ -101,7 +99,6 @@ function SessionDialog({
           ends_at,
           valor,
           atendimento: f.atendimento,
-          observacao: f.observacao.trim() || null,
           ...(n >= 2 ? { recorrencia: { frequencia: "semanal", ocorrencias: n } } : {}),
         },
       });
@@ -188,10 +185,6 @@ function SessionDialog({
                 <Input id="s-rep" type="number" min={2} max={52} placeholder="ex.: 12" value={f.repetir} onChange={(e) => setF({ ...f, repetir: e.target.value })} />
               </div>
             )}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="s-obs">Observação do agendamento (opcional)</Label>
-            <Textarea id="s-obs" rows={2} maxLength={500} placeholder="Ex.: chegar 10 min antes; trazer encaminhamento. Não registre conteúdo clínico aqui." value={f.observacao} onChange={(e) => setF({ ...f, observacao: e.target.value })} />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
@@ -781,7 +774,7 @@ export default function Agenda() {
                               {patientName.get(a.patient_id) ?? "Paciente"}
                             </Link>
                           </p>
-                          {a.observacao && <p className="text-xs italic text-amber-700 dark:text-amber-400">Obs.: {a.observacao}</p>}
+                          {patientById.get(a.patient_id)?.observacoes && <p className="text-xs italic text-amber-700 dark:text-amber-400">Obs.: {patientById.get(a.patient_id)!.observacoes}</p>}
                           <p className="text-xs text-muted-foreground">
                             {!isPsi && proName.get(a.professional_id) ? `${proName.get(a.professional_id)} · ` : ""}
                             {a.valor ? brl(Math.round(a.valor * 100)) : "sem valor"}

@@ -73,6 +73,8 @@ export interface Patient {
   nome: string;
   cpf: string | null;
   cns: string | null;
+  /** Observações gerais, abertas à equipe (não clínicas). */
+  observacoes: string | null;
   endereco: string | null;
   end_cep: string | null;
   end_logradouro: string | null;

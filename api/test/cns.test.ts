@@ -37,6 +37,7 @@ describe("CNS (Cartão Nacional de Saúde)", () => {
     expect(partes.json).toMatchObject({ end_cep: "01001000", end_uf: "SP", end_numero: "10", endereco: "Praça da Sé, 10, Sé, São Paulo/SP, CEP 01001-000" });
     expect((await call("PATCH", `/patients/${novo.json.id}`, { token: psi.token, body: { end_uf: "SPX" } })).status).toBe(400);
     expect((await call("PATCH", `/patients/${novo.json.id}`, { token: psi.token, body: { end_cep: "123" } })).status).toBe(400);
+    expect((await call("PATCH", `/patients/${novo.json.id}`, { token: psi.token, body: { observacoes: "Prefere contato por WhatsApp" } })).json.observacoes).toBe("Prefere contato por WhatsApp");
     const limpo = await call("PATCH", `/patients/${novo.json.id}`, { token: psi.token, body: { cns: null } });
     expect(limpo.json.cns).toBeNull();
   });
