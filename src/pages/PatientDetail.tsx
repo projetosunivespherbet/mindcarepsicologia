@@ -7,6 +7,9 @@ import { DocStatusBadge } from "@/components/DocStatusBadge";
 import { PatientCharges } from "@/components/PatientCharges";
 import { PatientPackages } from "@/components/PatientPackages";
 import { PatientRecords } from "@/components/PatientRecords";
+import { PatientTimeline } from "@/components/PatientTimeline";
+import { Scales } from "@/components/Scales";
+import { TherapyPlan } from "@/components/TherapyPlan";
 import { AddressInput, montarEndereco, type Endereco } from "@/components/AddressInput";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -302,9 +305,12 @@ export default function PatientDetail() {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="dados">
-              <TabsList>
+              <TabsList className="h-auto flex-wrap justify-start">
                 <TabsTrigger value="dados">Dados</TabsTrigger>
+                <TabsTrigger value="linha">Linha do tempo</TabsTrigger>
                 {canClinical && <TabsTrigger value="prontuario">Prontuário</TabsTrigger>}
+                {canClinical && <TabsTrigger value="plano">Plano terapêutico</TabsTrigger>}
+                {canClinical && <TabsTrigger value="escalas">Escalas</TabsTrigger>}
                 <TabsTrigger value="anamnese">Anamnese</TabsTrigger>
                 {canProduceDocuments && <TabsTrigger value="documentos">Documentos</TabsTrigger>}
                 <TabsTrigger value="cobrancas">Cobranças</TabsTrigger>
@@ -312,6 +318,19 @@ export default function PatientDetail() {
               <TabsContent value="dados" className="pt-4">
                 <DataForm key={`${p.id}-${p.nome}`} patient={p} />
               </TabsContent>
+              <TabsContent value="linha" className="pt-4">
+                <PatientTimeline patientId={p.id} />
+              </TabsContent>
+              {canClinical && (
+                <TabsContent value="plano" className="pt-4">
+                  <TherapyPlan patientId={p.id} />
+                </TabsContent>
+              )}
+              {canClinical && (
+                <TabsContent value="escalas" className="pt-4">
+                  <Scales patientId={p.id} />
+                </TabsContent>
+              )}
               {canClinical && (
                 <TabsContent value="prontuario" className="pt-4">
                   <PatientRecords patientId={p.id} />

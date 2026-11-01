@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ApiError, api, errMsg } from "@/lib/api";
 import { addDays, addMinutes, dayKey, dayLabel, hhmm, localInstant, minutesBetween, timeInput, toDateStr, weekStart } from "@/lib/dates";
 import { brl, centsToInput, parseBRL } from "@/lib/money";
+import { AttentionBanner } from "@/components/AttentionBanner";
 import { MiniCalendar, monthGridRange } from "@/components/MiniCalendar";
 import { SessionCard, STATUS } from "@/components/SessionCard";
 import { avisoRealizada, cobrarAvulso, marcarRealizada } from "@/lib/session";
@@ -722,6 +723,7 @@ export default function Agenda() {
           {pending.data!.length > 5 && <p className="text-xs text-muted-foreground">E mais {pending.data!.length - 5}. Preencha estas para ver as demais.</p>}
         </div>
       )}
+      <AttentionBanner proName={proName} showPro={!isPsi} />
       {appts.isError && <p className="text-sm text-destructive">{errMsg(appts.error, "Não foi possível carregar a agenda.")}</p>}
 
       {view === "dia" ? (

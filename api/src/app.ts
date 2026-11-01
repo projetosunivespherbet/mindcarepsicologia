@@ -11,6 +11,7 @@ import { changes } from "./routes/audit";
 import { clinic } from "./routes/clinic";
 import { fiscal, nfse } from "./routes/fiscal";
 import { charges, finance, payers, payments, services } from "./routes/finance";
+import { clinical, goals } from "./routes/clinical";
 import { packages } from "./routes/packages";
 import { patients } from "./routes/patients";
 import { professionals, users } from "./routes/users";
@@ -90,6 +91,8 @@ export function createApp(deps: Deps) {
   app.route("/users", users);
   app.route("/professionals", professionals);
   app.route("/patients", patients);
+  app.route("/patients", clinical);
+  app.route("/goals", goals);
   app.route("/appointments", appointments);
   app.route("/blocks", blocks);
   app.route("/documents", documents);

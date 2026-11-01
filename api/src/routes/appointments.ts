@@ -61,6 +61,32 @@ export const appointments = new Hono<AppEnv>();
 appointments.use("*", requireAuth);
 
 // Sessões realizadas, do próprio profissional, que ainda estão sem prontuário (últimos 180 dias).
+// Pacientes que podem estar se afastando: as duas últimas sessões foram faltas, ou não há retorno marcado
+// há mais de 21 dias (até 120: depois disso, provavelmente alta ou encerramento). A RLS limita ao que o usuário vê.
+appointments.get("/attention", async (c) => {
+  const rows = await withSession(c.get("pool"), c.get("session"), async (db) =>
+    (
+      await db.query(
+        `WITH u AS (
+           SELECT a.patient_id, a.professional_id,
+                  array_agg(a.status ORDER BY a.starts_at DESC) FILTER (WHERE a.starts_at <= now() AND a.status <> 'cancelado') AS hist,
+                  max(a.starts_at) FILTER (WHERE a.starts_at <= now() AND a.status <> 'cancelado') AS ultima,
+                  COALESCE(bool_or(a.starts_at > now() AND a.status IN ('agendado', 'confirmado')), false) AS tem_futura
+             FROM appointments a GROUP BY a.patient_id, a.professional_id
+         )
+         SELECT u.patient_id, p.nome, u.professional_id, u.ultima,
+                CASE WHEN u.hist[1] = 'faltou' AND u.hist[2] = 'faltou' THEN 'faltas_seguidas' ELSE 'sem_retorno' END AS motivo,
+                (now()::date - u.ultima::date) AS dias
+           FROM u JOIN patients p ON p.id = u.patient_id AND p.ativo
+          WHERE (u.hist[1] = 'faltou' AND u.hist[2] = 'faltou')
+             OR (NOT u.tem_futura AND u.ultima < now() - interval '21 days' AND u.ultima > now() - interval '120 days')
+          ORDER BY u.ultima DESC LIMIT 50`,
+      )
+    ).rows,
+  );
+  return c.json(rows);
+});
+
 appointments.get("/pending-records", author, async (c) => {
   const rows = await withSession(c.get("pool"), c.get("session"), async (db) =>
     (

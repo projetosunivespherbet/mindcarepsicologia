@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, History } from "lucide-react";
 import { RecordEditor } from "@/components/RecordEditor";
 import { RecordHistory, usePatientRecords } from "@/components/PatientRecords";
+import { Scales } from "@/components/Scales";
+import { TherapyPlan } from "@/components/TherapyPlan";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,7 +17,8 @@ import type { PatientDetail } from "@/lib/types";
 export default function Atendimento() {
   const { id = "", sessao = "" } = useParams();
   const { user } = useAuth();
-  const [historico, setHistorico] = useState(false);
+  const [painel, setPainel] = useState<"" | "historico" | "plano" | "escalas">("");
+  const alterna = (p: "historico" | "plano" | "escalas") => setPainel(painel === p ? "" : p);
   const patient = useQuery({ queryKey: ["patient", id], queryFn: () => api<PatientDetail>(`/patients/${id}`), retry: false });
   const records = usePatientRecords(id);
   const list = records.data ?? [];
@@ -41,9 +44,15 @@ export default function Atendimento() {
                 Atendimento de {new Date(current.starts_at).toLocaleDateString("pt-BR")}, {hhmm(current.starts_at)}–{hhmm(current.ends_at)}
               </CardDescription>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" aria-expanded={historico} onClick={() => setHistorico(!historico)}>
-                <History className="mr-2 h-4 w-4" /> {historico ? "Ocultar histórico" : "Histórico do paciente"}
+            <div className="flex flex-wrap gap-2">
+              <Button variant={painel === "historico" ? "default" : "outline"} aria-expanded={painel === "historico"} onClick={() => alterna("historico")}>
+                <History className="mr-2 h-4 w-4" /> Histórico do paciente
+              </Button>
+              <Button variant={painel === "plano" ? "default" : "outline"} aria-expanded={painel === "plano"} onClick={() => alterna("plano")}>
+                Plano terapêutico
+              </Button>
+              <Button variant={painel === "escalas" ? "default" : "outline"} aria-expanded={painel === "escalas"} onClick={() => alterna("escalas")}>
+                Escalas
               </Button>
               <Button asChild variant="ghost">
                 <Link to={`/pacientes/${id}`}>Ficha</Link>
@@ -51,7 +60,17 @@ export default function Atendimento() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {historico && (
+            {painel === "plano" && (
+              <section aria-label="Plano terapêutico" className="rounded-xl border p-3">
+                <TherapyPlan patientId={id} appointmentId={current.appointment_id} />
+              </section>
+            )}
+            {painel === "escalas" && (
+              <section aria-label="Escalas" className="rounded-xl border p-3">
+                <Scales patientId={id} appointmentId={current.appointment_id} />
+              </section>
+            )}
+            {painel === "historico" && (
               <section aria-label="Histórico do paciente" className="space-y-2">
                 <h2 className="text-sm font-semibold">Sessões anteriores</h2>
                 <RecordHistory list={list.filter((r) => r.appointment_id !== current.appointment_id)} />

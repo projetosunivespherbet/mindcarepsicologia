@@ -320,3 +320,50 @@ export interface SessionPackage {
   charge_paid_centavos: number;
   created_at: string;
 }
+
+export interface GoalProgress {
+  id: string;
+  nota: number;
+  comentario: string | null;
+  appointment_id: string | null;
+  created_at: string;
+}
+
+export interface TherapyGoal {
+  id: string;
+  patient_id: string;
+  titulo: string;
+  descricao: string | null;
+  status: "ativa" | "alcancada" | "suspensa";
+  created_at: string;
+  avancos: GoalProgress[];
+}
+
+export interface ScaleApplication {
+  id: string;
+  escala: "phq9" | "gad7";
+  respostas: number[];
+  pontuacao: number;
+  faixa: string;
+  alerta: boolean;
+  appointment_id: string | null;
+  created_at: string;
+}
+
+export interface AttentionItem {
+  patient_id: string;
+  nome: string;
+  professional_id: string;
+  ultima: string;
+  motivo: "faltas_seguidas" | "sem_retorno";
+  dias: number;
+}
+
+export interface TimelineItem {
+  quando: string;
+  tipo: "sessao" | "cobranca" | "pagamento" | "estorno" | "documento" | "meta" | "escala";
+  titulo: string | null;
+  detalhe: string | null;
+  valor_centavos: number | null;
+  ref: string;
+}
