@@ -327,7 +327,7 @@ describe.skipIf(!process.env.E2E_PG)("fluxo completo: telas + API + Postgres", (
     await call("PATCH", `/appointments/${ap.id}`, { token: seed.anaToken, body: { status: "realizado" } });
 
     await openApp("/financeiro", seed.adminToken);
-    expect(await screen.findByText("Faturado no mês")).toBeInTheDocument();
+    expect(await screen.findByText("Cobrado no mês")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Gerar cobranças do mês" }));
     await waitFor(async () => {
       const lista = (await call("GET", `/charges?patient_id=${seed.patient.id}`, { token: seed.anaToken })).json as Array<{ appointment_id: string | null }>;
@@ -358,6 +358,7 @@ describe.skipIf(!process.env.E2E_PG)("fluxo completo: telas + API + Postgres", (
 
   it("administração vê o resumo por profissional no Financeiro", async () => {
     await openApp("/financeiro", seed.adminToken);
+    await userEvent.setup().click(await screen.findByRole("tab", { name: "Resumo" }, { timeout: 5000 }));
     expect(await screen.findByText("Por profissional", undefined, { timeout: 5000 })).toBeInTheDocument();
     expect(await screen.findByText("Dra. Ana Lima", { selector: "span" })).toBeInTheDocument(); // o nome também aparece no seletor do Receita Saúde
   });
@@ -396,6 +397,7 @@ describe.skipIf(!process.env.E2E_PG)("fluxo completo: telas + API + Postgres", (
     cleanup();
 
     await openApp("/financeiro", seed.adminToken);
+    await user.click(await screen.findByRole("tab", { name: "Fiscal" }, { timeout: 5000 }));
     expect(await screen.findByText("Pendências de emissão", undefined, { timeout: 5000 })).toBeInTheDocument();
     await user.click((await screen.findAllByRole("button", { name: "Abrir" }))[0]!);
     expect(await screen.findByRole("button", { name: "Preparar nota fiscal" }, { timeout: 5000 })).toBeInTheDocument();

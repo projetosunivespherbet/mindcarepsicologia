@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, errMsg } from "@/lib/api";
 import { addDays, localInstant, monthRange, todayIn, toDateStr } from "@/lib/dates";
@@ -34,12 +35,13 @@ const FAIXAS: { key: keyof Receivables["totais"]; label: string }[] = [
   { key: "mais_de_60", label: "Mais de 60 dias" },
 ];
 
-function Stat({ label, value, tone }: { label: string; value: number; tone?: "bad" }) {
+function Stat({ label, value, tone, hint }: { label: string; value: number; tone?: "bad"; hint?: string }) {
   return (
     <Card>
       <CardContent className="p-4">
         <p className="text-xs text-muted-foreground">{label}</p>
         <p className={`text-xl font-semibold ${tone === "bad" && value > 0 ? "text-destructive" : ""}`}>{brl(value)}</p>
+        {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
       </CardContent>
     </Card>
   );
@@ -186,58 +188,43 @@ export default function Finance() {
       </div>
 
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-        <Stat label="Faturado no mês" value={summary.data?.faturado_centavos ?? 0} />
-        <Stat label="Recebido no mês" value={summary.data?.recebido_centavos ?? 0} />
-        <Stat label="Em aberto (total)" value={summary.data?.em_aberto_centavos ?? 0} />
-        <Stat label="Atrasado" value={summary.data?.atrasado_centavos ?? 0} tone="bad" />
+        <Stat label="Cobrado no mês" hint="Total das cobranças geradas, pagas ou não" value={summary.data?.faturado_centavos ?? 0} />
+        <Stat label="Recebido no mês" hint="O que já foi pago" value={summary.data?.recebido_centavos ?? 0} />
+        <Stat label="A receber" hint="Cobrado e ainda não pago" value={summary.data?.em_aberto_centavos ?? 0} />
+        <Stat label="Atrasado" hint="A receber com vencimento passado" value={summary.data?.atrasado_centavos ?? 0} tone="bad" />
       </div>
 
-      {role !== "psicologo" && (summary.data?.por_profissional.length ?? 0) > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Por profissional</CardTitle>
-            <CardDescription>Faturado e recebido no mês; em aberto e atrasado são o saldo atual.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="divide-y rounded-xl border bg-card">
-              {summary.data?.por_profissional.map((p) => (
-                <li key={p.professional_id} className="grid gap-1 p-3 text-sm sm:grid-cols-5 sm:items-center">
-                  <span className="font-medium sm:col-span-1">{p.nome}</span>
-                  <span>Faturado {brl(p.faturado_centavos)}</span>
-                  <span>Recebido {brl(p.recebido_centavos)}</span>
-                  <span>Em aberto {brl(p.em_aberto_centavos)}</span>
-                  <span className={p.atrasado_centavos > 0 ? "text-destructive" : ""}>Atrasado {brl(p.atrasado_centavos)}</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
+      <Tabs defaultValue="cobrancas" className="space-y-4">
+        <TabsList className="h-auto flex-wrap justify-start">
+          <TabsTrigger value="cobrancas">Cobranças</TabsTrigger>
+          {role !== "psicologo" && <TabsTrigger value="resumo">Resumo</TabsTrigger>}
+          <TabsTrigger value="fiscal">Fiscal</TabsTrigger>
+          {role !== "recepcao" && <TabsTrigger value="servicos">Serviços</TabsTrigger>}
+        </TabsList>
 
-      {canBulk && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Cobranças das sessões</CardTitle>
-            <CardDescription>Cria as cobranças das sessões realizadas no mês que ainda não têm. Repetir não duplica.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Switch id="f-faltas" checked={incluirFaltas} onCheckedChange={setIncluirFaltas} />
-              <Label htmlFor="f-faltas">Incluir faltas</Label>
-            </div>
-            <Button onClick={() => generate.mutate()} disabled={generate.isPending}>
-              {generate.isPending ? "Gerando..." : "Gerar cobranças do mês"}
-            </Button>
-            {role === "admin" && (
-              <Button variant="outline" onClick={() => void downloadAuthed(`/finance/export?from=${from}&to=${to}`, `financeiro-${from}_${to}.csv`)}>
-                <Download className="w-4 h-4 mr-2" /> Exportar CSV
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {(role === "admin" || role === "psicologo") && <ReceitaSaudeCard ym={ym} />}
+        <TabsContent value="cobrancas" className="space-y-4">
+          {canBulk && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Gerar cobranças do mês</CardTitle>
+                <CardDescription>Cria as cobranças das sessões realizadas no mês que ainda não têm. Repetir não duplica.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Switch id="f-faltas" checked={incluirFaltas} onCheckedChange={setIncluirFaltas} />
+                  <Label htmlFor="f-faltas">Incluir faltas</Label>
+                </div>
+                <Button onClick={() => generate.mutate()} disabled={generate.isPending}>
+                  {generate.isPending ? "Gerando..." : "Gerar cobranças do mês"}
+                </Button>
+                {role === "admin" && (
+                  <Button variant="outline" onClick={() => void downloadAuthed(`/finance/export?from=${from}&to=${to}`, `financeiro-${from}_${to}.csv`)}>
+                    <Download className="w-4 h-4 mr-2" /> Exportar CSV
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
       <Card>
         <CardHeader>
@@ -276,7 +263,54 @@ export default function Finance() {
           </ul>
         </CardContent>
       </Card>
+        </TabsContent>
 
+        {role !== "psicologo" && (
+        <TabsContent value="resumo" className="space-y-4">
+      {role !== "psicologo" && (summary.data?.por_profissional.length ?? 0) > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Por profissional</CardTitle>
+            <CardDescription>Cobrado e recebido no mês; a receber e atrasado são o saldo atual.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y rounded-xl border bg-card">
+              {summary.data?.por_profissional.map((p) => (
+                <li key={p.professional_id} className="grid gap-1 p-3 text-sm sm:grid-cols-5 sm:items-center">
+                  <span className="font-medium sm:col-span-1">{p.nome}</span>
+                  <span>Cobrado {brl(p.faturado_centavos)}</span>
+                  <span>Recebido {brl(p.recebido_centavos)}</span>
+                  <span>A receber {brl(p.em_aberto_centavos)}</span>
+                  <span className={p.atrasado_centavos > 0 ? "text-destructive" : ""}>Atrasado {brl(p.atrasado_centavos)}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+      {canBulk && receivables.data && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Inadimplência</CardTitle>
+            <CardDescription>Saldo em aberto por idade do vencimento.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid gap-2 grid-cols-2 lg:grid-cols-5">
+              {FAIXAS.map((f) => (
+                <div key={f.key} className="rounded-xl border p-3">
+                  <p className="text-xs text-muted-foreground">{f.label}</p>
+                  <p className="font-semibold">{brl(receivables.data.totais[f.key])}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+        </TabsContent>
+        )}
+
+        <TabsContent value="fiscal" className="space-y-4">
+          {(role === "admin" || role === "psicologo") && <ReceitaSaudeCard ym={ym} />}
       {pending.data && pending.data.itens.length > 0 && (
         <Card>
           <CardHeader>
@@ -308,27 +342,14 @@ export default function Finance() {
           </CardContent>
         </Card>
       )}
+        </TabsContent>
 
-      {canBulk && receivables.data && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Inadimplência</CardTitle>
-            <CardDescription>Saldo em aberto por idade do vencimento.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid gap-2 grid-cols-2 lg:grid-cols-5">
-              {FAIXAS.map((f) => (
-                <div key={f.key} className="rounded-xl border p-3">
-                  <p className="text-xs text-muted-foreground">{f.label}</p>
-                  <p className="font-semibold">{brl(receivables.data.totais[f.key])}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {role !== "recepcao" && <Services />}
+        {role !== "recepcao" && (
+          <TabsContent value="servicos">
+            <Services />
+          </TabsContent>
+        )}
+      </Tabs>
 
       <ReceiveDialog charge={receiving} onClose={() => setReceiving(null)} />
       <DetailDialog chargeId={detailId} onClose={() => setDetailId(null)} />

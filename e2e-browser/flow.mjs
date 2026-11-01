@@ -353,7 +353,7 @@ await step("psicólogo cadastra o emissor, prepara a nota da cobrança e registr
 
 await step("administração vê o resumo do mês e baixa o CSV do financeiro", async () => {
   await admin.goto(`${BASE}/financeiro`);
-  await see(admin, "Faturado no mês");
+  await see(admin, "Cobrado no mês");
   await see(admin, "Cobranças de");
   const texto = await admin.evaluate(() => document.body.innerText);
   if (!texto.includes("175,00")) throw new Error("o resumo não mostra o valor recebido (175,00)");
@@ -395,6 +395,7 @@ await step("psicólogo registra uma sessão pro bono (sem valor, sem cobrança) 
 
 await step("administração vê as pendências de emissão e o histórico de uma sessão", async () => {
   await admin.goto(`${BASE}/financeiro`);
+  await click(admin, aria("Fiscal", "tab"));
   await see(admin, "Pendências de emissão");
   await admin.goto(`${BASE}/agenda`);
   await click(admin, aria("Histórico", "button"));
@@ -417,6 +418,7 @@ await step("psicólogo bloqueia um horário na agenda e remove o bloqueio", asyn
 
 await step("administração vê o resumo por profissional", async () => {
   await admin.goto(`${BASE}/financeiro`);
+  await click(admin, aria("Resumo", "tab"));
   await see(admin, "Por profissional");
 });
 
