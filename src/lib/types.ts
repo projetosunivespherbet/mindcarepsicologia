@@ -232,6 +232,8 @@ export interface Appointment {
   convenio: boolean;
   atendimento: Atendimento;
   nota_status: FiscalStatus | null;
+  /** true/false só para o profissional da sessão (psicólogo); nulo para quem não acessa o prontuário. */
+  prontuario: boolean | null;
   imposto: boolean;
   series_id: string | null;
 }
