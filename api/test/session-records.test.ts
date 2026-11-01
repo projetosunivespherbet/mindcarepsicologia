@@ -181,3 +181,39 @@ describe("prontuário da sessão", () => {
     expect(item.created_at).toBeTruthy();
   });
 });
+
+describe("trilha e documento do prontuário", () => {
+  it("cada gravação guarda uma versão imutável, lida só pelo psicólogo da sessão", async () => {
+    const s = await cenario();
+    const id = await s.sessao(0, "realizado");
+    const put = (body: unknown) => call("PUT", `/appointments/${id}/record`, { token: s.psiA.token, body });
+    await put({ conteudo: "Versão 1." });
+    await put({ conteudo: "Versão 2.", anotacoes: "Nota." });
+    const v = await ownerPool.query("SELECT conteudo, anotacoes FROM session_record_versions WHERE appointment_id = $1 ORDER BY saved_at, id", [id]);
+    expect(v.rows).toEqual([{ conteudo: "Versão 1.", anotacoes: "" }, { conteudo: "Versão 2.", anotacoes: "Nota." }]);
+    await expect(appPool.query("UPDATE session_record_versions SET conteudo = 'x'")).rejects.toThrow();
+    await expect(appPool.query("DELETE FROM session_record_versions")).rejects.toThrow();
+  });
+
+  it("exporta só as sessões escolhidas, com as anotações privativas que o profissional marcar", async () => {
+    const s = await cenario();
+    const a = await s.sessao(0, "realizado");
+    const b = await s.sessao(1, "realizado");
+    await call("PUT", `/appointments/${a}/record`, { token: s.psiA.token, body: { conteudo: "Sessão A.", anotacoes: "Privada A." } });
+    await call("PUT", `/appointments/${b}/record`, { token: s.psiA.token, body: { conteudo: "Sessão B.", anotacoes: "Privada B." } });
+    const exp = (token: string, sessoes: unknown) => call("POST", `/patients/${s.pac.id}/records/export`, { token, body: { sessoes } });
+
+    const r = await exp(s.psiA.token, [{ id: a, anotacoes: true }, { id: b, anotacoes: false }]);
+    expect(r.status).toBe(200);
+    expect(r.json.paciente.nome).toBe("Paciente Um");
+    expect(r.json.profissional).toMatchObject({ nome: "Dra. Ana Lima", crp: "06/12345" });
+    expect(r.json.clinica).toBe("Clínica Teste");
+    expect(r.json.itens.map((i: { conteudo: string; anotacoes: string | null }) => [i.conteudo, i.anotacoes])).toEqual([["Sessão A.", "Privada A."], ["Sessão B.", null]]);
+
+    expect((await exp(s.psiA.token, [])).status).toBe(400);
+    for (const token of [s.rec.token, s.c.adminToken]) expect((await exp(token, [{ id: a, anotacoes: true }])).status).toBe(403);
+    expect((await exp(s.psiB.token, [{ id: a, anotacoes: true }])).json.itens).toEqual([]);
+    const log = await ownerPool.query("SELECT count(*)::int AS n FROM audit_log WHERE clinic_id = $1 AND action = 'session_record.export'", [s.c.clinicId]);
+    expect(log.rows[0].n).toBe(2);
+  });
+});

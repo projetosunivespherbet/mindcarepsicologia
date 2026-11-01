@@ -305,7 +305,7 @@ describe.skipIf(!process.env.E2E_PG)("fluxo completo: telas + API + Postgres", (
     // card da sessão: contato, quem marcou e a ação principal "Iniciar atendimento", que leva à ficha do paciente
     await user.click(await screen.findByRole("button", { name: "Abrir" }));
     expect(await screen.findByText(/Agendada em/)).toBeInTheDocument();
-    await user.click(await screen.findByRole("button", { name: "Iniciar atendimento" }));
+    await user.click(await screen.findByRole("button", { name: "Atender" }));
     await user.type(await screen.findByLabelText("Prontuário da sessão"), "Evolução da sessão.");
     await user.type(screen.getByLabelText("Anotações privativas"), "Hipótese em observação.");
     await user.click(screen.getByRole("button", { name: "Salvar e concluir atendimento" }));
@@ -385,7 +385,7 @@ describe.skipIf(!process.env.E2E_PG)("fluxo completo: telas + API + Postgres", (
     await user.click(screen.getByRole("button", { name: "Agendar" }));
     const linha = (await screen.findByText("Pro bono", undefined, { timeout: 5000 })).closest("li")!;
     await user.click(within(linha).getByRole("button", { name: "Abrir" }));
-    await user.click(await screen.findByRole("button", { name: "Iniciar atendimento" }));
+    await user.click(await screen.findByRole("button", { name: "Atender" }));
     await user.type(await screen.findByLabelText("Prontuário da sessão"), "Sessão pro bono.");
     await user.click(screen.getByRole("button", { name: "Salvar e concluir atendimento" }));
 

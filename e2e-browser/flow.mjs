@@ -316,7 +316,7 @@ await step("psicólogo agenda a sessão de hoje e marca como realizada (a cobran
   await click(psi, aria("Agendar", "button"));
   await see(psi, "Agendado");
   await click(psi, aria("Abrir", "button"));
-  await click(psi, aria("Iniciar atendimento", "button"));
+  await click(psi, aria("Atender", "button"));
   await fill(psi, "#pr-conteudo", "Evolução da sessão.");
   await click(psi, aria("Salvar e concluir atendimento", "button"));
   await see(psi, "cobrança criada");
@@ -386,7 +386,7 @@ await step("psicólogo registra uma sessão pro bono (sem valor, sem cobrança) 
   await click(psi, aria("Agendar", "button"));
   await see(psi, "Pro bono");
   await click(psi, aria("Abrir", "button"));
-  await click(psi, aria("Iniciar atendimento", "button"));
+  await click(psi, aria("Atender", "button"));
   await fill(psi, "#pr-conteudo", "Sessão pro bono.");
   await click(psi, aria("Salvar e concluir atendimento", "button"));
   await see(psi, "Sessão pro bono registrada");
@@ -398,7 +398,7 @@ await step("psicólogo registra uma sessão pro bono (sem valor, sem cobrança) 
   await click(psi, aria("Agendar", "button"));
   await psi.goto(`${BASE}/agenda`);
   await click(psi, aria("Abrir", "button"));
-  await click(psi, aria("Iniciar atendimento", "button"));
+  await click(psi, aria("Atender", "button"));
   await fill(psi, "#pr-conteudo", "Sessão particular.");
   await click(psi, aria("Salvar e concluir atendimento", "button"));
   await see(psi, "cobrança criada");

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, FilePlus2 } from "lucide-react";
 import { toast } from "sonner";
@@ -196,7 +196,6 @@ export default function PatientDetail() {
   const { user, canProduceDocuments } = useAuth();
   const q = useQuery({ queryKey: ["patient", id], queryFn: () => api<PatientDetailType>(`/patients/${id}`), retry: false });
   const p = q.data;
-  const [params] = useSearchParams();
 
   const canClinical = !!user && !!p && ((user.role === "psicologo" && p.professional_id === user.id) || (user.role === "admin" && user.atende));
 
@@ -216,7 +215,7 @@ export default function PatientDetail() {
             <CardDescription>{p.ativo ? "Paciente ativo" : "Paciente inativo"}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue={canClinical && params.get("sessao") ? "prontuario" : "dados"}>
+            <Tabs defaultValue="dados">
               <TabsList>
                 <TabsTrigger value="dados">Dados</TabsTrigger>
                 {canClinical && <TabsTrigger value="prontuario">Prontuário</TabsTrigger>}

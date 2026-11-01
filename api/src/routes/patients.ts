@@ -107,6 +107,46 @@ patients.get("/:id/records", async (c) => {
   return c.json(rows);
 });
 
+// Documento do prontuário: o profissional escolhe as sessões e quais anotações privativas acompanham.
+patients.post("/:id/records/export", async (c) => {
+  const s = c.get("session");
+  if (!(s.role === "psicologo" || (s.role === "admin" && s.atende))) {
+    throw new HTTPException(403, { message: "Apenas o psicólogo responsável acessa o prontuário" });
+  }
+  const body = await readBody(c, z.object({ sessoes: z.array(z.object({ id: z.uuid(), anotacoes: z.boolean() })).min(1, "Escolha ao menos uma sessão").max(200) }));
+  const incluir = new Map(body.sessoes.map((x) => [x.id, x.anotacoes]));
+  const out = await withSession(c.get("pool"), s, async (db) => {
+    const p = (await db.query(`SELECT nome, cpf, cns, data_nascimento::text AS data_nascimento FROM patients WHERE id = $1`, [c.req.param("id")])).rows[0];
+    if (!p) throw new HTTPException(404, { message: "Paciente não encontrado" });
+    const prof = (await db.query(`SELECT nome, crp FROM users WHERE id = app_user()`)).rows[0];
+    const clinica = (await db.query(`SELECT nome FROM clinics WHERE id = app_clinic()`)).rows[0];
+    const rows = (
+      await db.query(
+        `SELECT a.id, a.starts_at, a.ends_at, a.status, r.conteudo, r.anotacoes
+         FROM appointments a JOIN session_records r ON r.appointment_id = a.id
+         WHERE a.patient_id = $1 AND a.professional_id = app_user() AND a.id = ANY($2::uuid[])
+         ORDER BY a.starts_at`,
+        [c.req.param("id"), body.sessoes.map((x) => x.id)],
+      )
+    ).rows;
+    await audit(db, s, "session_record.export", "patient", c.req.param("id"));
+    return {
+      paciente: p,
+      profissional: prof ?? null,
+      clinica: clinica?.nome ?? "",
+      itens: rows.map((r: { id: string; starts_at: string; ends_at: string; status: string; conteudo: string; anotacoes: string }) => ({
+        appointment_id: r.id,
+        starts_at: r.starts_at,
+        ends_at: r.ends_at,
+        status: r.status,
+        conteudo: r.conteudo,
+        anotacoes: incluir.get(r.id) && r.anotacoes ? r.anotacoes : null,
+      })),
+    };
+  });
+  return c.json(out);
+});
+
 patients.patch("/:id", async (c) => {
   const s = c.get("session");
   const body = await readBody(c, z.object({ ...patientFields, ativo: z.boolean() }).partial());

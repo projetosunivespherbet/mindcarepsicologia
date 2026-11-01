@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { dayKey, dayLabel, hhmm } from "@/lib/dates";
 import { downloadIcs, icsContent, reminderText, whatsappNumber, whatsappUrl } from "@/lib/reminder";
 import type { Appointment, AppointmentStatus, Patient } from "@/lib/types";
+import { formatCns, formatCpf } from "@shared/documents";
 
 export const STATUS: Record<AppointmentStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   agendado: { label: "Agendado", variant: "secondary" },
@@ -17,16 +18,24 @@ export const STATUS: Record<AppointmentStatus, { label: string; variant: "defaul
 
 const quando = (iso: string) => `${new Date(iso).toLocaleDateString("pt-BR")} às ${hhmm(iso)}`;
 
-function Group({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+function idade(nasc: string): string {
+  const n = new Date(`${nasc}T12:00:00`);
+  const hoje = new Date();
+  let anos = hoje.getFullYear() - n.getFullYear();
+  if (hoje.getMonth() < n.getMonth() || (hoje.getMonth() === n.getMonth() && hoje.getDate() < n.getDate())) anos--;
+  return `${nasc.split("-").reverse().join("/")} (${anos} anos)`;
+}
+
+function Info({ rotulo, valor }: { rotulo: string; valor?: string | null }) {
   return (
-    <section className="space-y-2 border-t pt-3">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{titulo}</h3>
-      <div className="flex flex-wrap items-center gap-2">{children}</div>
-    </section>
+    <>
+      <dt className="text-muted-foreground">{rotulo}</dt>
+      <dd className="break-words">{valor || <span className="text-muted-foreground">não informado</span>}</dd>
+    </>
   );
 }
 
-/** Card da sessão na agenda: quem é, contato, quando foi marcada e o que fazer — com uma ação principal. */
+/** Card da sessão (como no PEC e-SUS): dados e contatos do paciente, quando foi agendada e as duas ações principais. */
 export function SessionCard({
   appt,
   patient,
@@ -56,7 +65,7 @@ export function SessionCard({
   const started = !!a && new Date(a.starts_at).getTime() <= Date.now();
   const wait = started ? undefined : "Disponível a partir do horário de início da sessão";
   const phone = whatsappNumber(patient?.telefone);
-  const ficha = a ? `/pacientes/${a.patient_id}?sessao=${a.id}` : "";
+  const atender = a ? `/pacientes/${a.patient_id}/atendimento/${a.id}` : "";
 
   return (
     <Dialog open={!!a} onOpenChange={(o) => !o && onClose()}>
@@ -86,61 +95,56 @@ export function SessionCard({
               )}
             </div>
 
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-              <dt className="text-muted-foreground">Telefone</dt>
-              <dd>{patient?.telefone || "não informado"}</dd>
-              <dt className="text-muted-foreground">E-mail</dt>
-              <dd className="break-all">{patient?.email || "não informado"}</dd>
-              {proName && (
-                <>
-                  <dt className="text-muted-foreground">Psicólogo</dt>
-                  <dd>{proName}</dd>
-                </>
-              )}
-              <dt className="text-muted-foreground">Agendada em</dt>
-              <dd>
-                {quando(a.created_at)}
+            <section aria-label="Dados do paciente" className="rounded-lg border bg-muted/30 p-3">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Paciente</h3>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+                <Info rotulo="Nascimento" valor={patient?.data_nascimento ? idade(patient.data_nascimento) : null} />
+                <Info rotulo="Telefone" valor={patient?.telefone} />
+                <Info rotulo="E-mail" valor={patient?.email} />
+                <Info rotulo="CPF" valor={patient?.cpf ? formatCpf(patient.cpf) : null} />
+                <Info rotulo="CNS" valor={patient?.cns ? formatCns(patient.cns) : null} />
+              </dl>
+            </section>
+
+            <section aria-label="Agendamento" className="text-sm">
+              <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Agendamento</h3>
+              <p>
+                Agendada em {quando(a.created_at)}
                 {a.agendado_por ? ` por ${a.agendado_por}` : ""}
-              </dd>
-            </dl>
+              </p>
+              {proName && <p>Psicólogo: {proName}</p>}
+            </section>
 
-            {author && (a.status === "realizado" || a.status === "faltou" || open) && (
-              <div className="border-t pt-3">
-                {open ? (
-                  <Button className="w-full" disabled={!started} title={wait} onClick={() => navigate(ficha)}>
-                    Iniciar atendimento
-                  </Button>
-                ) : (
-                  <Button className="w-full" variant={a.prontuario ? "outline" : "default"} onClick={() => navigate(ficha)}>
-                    {a.prontuario ? "Abrir prontuário" : "Preencher prontuário"}
-                  </Button>
-                )}
-                {open && !started && <p className="mt-1 text-xs text-muted-foreground">O atendimento pode ser iniciado a partir do horário da sessão.</p>}
-              </div>
-            )}
+            <div className="flex flex-wrap gap-2 border-t pt-3">
+              {author && (open || a.status === "realizado" || a.status === "faltou") && (
+                <Button className="flex-1" variant={open ? "default" : a.prontuario ? "outline" : "default"} disabled={open && !started} title={open ? wait : undefined} onClick={() => navigate(atender)}>
+                  {open ? "Atender" : a.prontuario ? "Abrir prontuário" : "Preencher prontuário"}
+                </Button>
+              )}
+              {open && (
+                <Button className="flex-1" variant="outline" disabled={busy} onClick={() => onStatus(a, "cancelado")}>
+                  Cancelar consulta
+                </Button>
+              )}
+            </div>
+            {open && !started && author && <p className="-mt-1 text-xs text-muted-foreground">O atendimento pode ser iniciado a partir do horário da sessão.</p>}
 
-            {open && (
-              <Group titulo="Situação da sessão">
-                {a.status === "agendado" && (
-                  <Button size="sm" variant="outline" disabled={busy} onClick={() => onStatus(a, "confirmado")}>
-                    Confirmar
-                  </Button>
-                )}
-                {!author && (
-                  <Button size="sm" disabled={busy || !started} title={wait} onClick={() => onStatus(a, "realizado")}>
-                    Marcar como realizada
-                  </Button>
-                )}
-                <Button size="sm" variant="outline" disabled={busy || !started} title={wait} onClick={() => onStatus(a, "faltou")}>
+            <div className="flex flex-wrap items-center gap-1 text-sm">
+              {open && a.status === "agendado" && (
+                <Button size="sm" variant="ghost" disabled={busy} onClick={() => onStatus(a, "confirmado")}>
+                  Confirmar
+                </Button>
+              )}
+              {open && (
+                <Button size="sm" variant="ghost" disabled={busy || !started} title={wait} onClick={() => onStatus(a, "faltou")}>
                   Faltou
                 </Button>
-                <Button size="sm" variant="ghost" disabled={busy} onClick={() => onStatus(a, "cancelado")}>
-                  Cancelar
+              )}
+              {open && !author && (
+                <Button size="sm" variant="ghost" disabled={busy || !started} title={wait} onClick={() => onStatus(a, "realizado")}>
+                  Marcar como realizada
                 </Button>
-              </Group>
-            )}
-
-            <Group titulo="Outras ações">
+              )}
               {a.status !== "cancelado" && (
                 <Button size="sm" variant="ghost" onClick={() => onReschedule(a)}>
                   Remarcar
@@ -150,9 +154,7 @@ export function SessionCard({
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() =>
-                    window.open(whatsappUrl(phone, reminderText({ paciente: patientName, clinica: user?.clinic_nome ?? "", starts_at: a.starts_at, ends_at: a.ends_at })), "_blank", "noopener")
-                  }
+                  onClick={() => window.open(whatsappUrl(phone, reminderText({ paciente: patientName, clinica: user?.clinic_nome ?? "", starts_at: a.starts_at, ends_at: a.ends_at })), "_blank", "noopener")}
                 >
                   Lembrete (WhatsApp)
                 </Button>
@@ -175,7 +177,7 @@ export function SessionCard({
                   Histórico
                 </Button>
               )}
-            </Group>
+            </div>
           </>
         )}
       </DialogContent>

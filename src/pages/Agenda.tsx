@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, ChevronLeft, ChevronRight, List, Plus } from "lucide-react";
+import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, List, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { NativeSelect } from "@/components/NativeSelect";
 import { Badge } from "@/components/ui/badge";
@@ -380,6 +380,7 @@ function WeekGrid({
   showFree,
   onSelect,
   onPickSlot,
+  detail,
 }: {
   selected: string;
   days: string[];
@@ -389,6 +390,8 @@ function WeekGrid({
   showFree: boolean; // só faz sentido para um profissional (com vários, "livre" é ambíguo)
   onSelect: (a: Appointment) => void;
   onPickSlot: (date: string, time: string) => void;
+  /** Visão diária: texto extra em cada sessão (telefone, psicólogo). */
+  detail?: (a: Appointment) => string;
 }) {
   const live = appts.filter((a) => a.status !== "cancelado");
   const perDay = days.map((d) => {
@@ -414,11 +417,12 @@ function WeekGrid({
   const endHour = Math.min(24, Math.max(21, ...all.map((i) => Math.ceil(i.end / 60))));
   const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
   const today = toDateStr(new Date());
-  const cols = { gridTemplateColumns: "44px repeat(7, minmax(0, 1fr))" };
+  const single = days.length === 1;
+  const cols = { gridTemplateColumns: `${single ? 52 : 44}px repeat(${days.length}, minmax(0, 1fr))` };
 
   return (
     <div className="overflow-x-auto rounded-xl border bg-card">
-      <div className="min-w-[760px]">
+      <div className={single ? "" : "min-w-[760px]"}>
         <div className="grid border-b bg-muted/40" style={cols}>
           <div />
           {perDay.map(({ d, items }) => (
@@ -476,8 +480,15 @@ function WeekGrid({
                       onClick={() => onSelect(a)}
                     >
                       <p className="truncate font-medium">
-                        {hhmm(a.starts_at)} {patientName.get(a.patient_id) ?? "Paciente"}
+                        {single ? `${hhmm(a.starts_at)}–${hhmm(a.ends_at)}` : hhmm(a.starts_at)} {patientName.get(a.patient_id) ?? "Paciente"}
                       </p>
+                      {single && (
+                        <p className="truncate text-[11px] text-muted-foreground">
+                          {STATUS[a.status].label}
+                          {a.atendimento !== "particular" ? ` · ${a.atendimento === "pro_bono" ? "Pro bono" : "Convênio"}` : ""}
+                          {detail?.(a) ? ` · ${detail(a)}` : ""}
+                        </p>
+                      )}
                       {a.status === "realizado" && a.prontuario === false && <p className="truncate text-[10px] text-amber-700 dark:text-amber-400">Sem prontuário</p>}
                     </button>
                   </div>
@@ -511,10 +522,10 @@ export default function Agenda() {
   const [creating, setCreating] = useState(false);
   const [blocking, setBlocking] = useState(false);
   const [history, setHistory] = useState<string | null>(null);
-  const [view, setView] = useState<"grade" | "lista">(() => {
+  const [view, setView] = useState<"dia" | "grade" | "lista">(() => {
     try {
       const v = localStorage.getItem("agenda-view");
-      if (v === "grade" || v === "lista") return v;
+      if (v === "dia" || v === "grade" || v === "lista") return v;
     } catch {
       /* sem armazenamento: usa a lista */
     }
@@ -522,7 +533,7 @@ export default function Agenda() {
   });
   const [slot, setSlot] = useState<{ date: string; time: string } | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
-  const changeView = (v: "grade" | "lista") => {
+  const changeView = (v: "dia" | "grade" | "lista") => {
     setView(v);
     try {
       localStorage.setItem("agenda-view", v);
@@ -617,7 +628,8 @@ export default function Agenda() {
   const baseDate = selected;
   const detailAppt = (appts.data ?? []).find((a) => a.id === detail) ?? null;
 
-  const rangeLabel = `${days[0]!.split("-").reverse().slice(0, 2).join("/")} a ${days[6]!.split("-").reverse().slice(0, 2).join("/")}`;
+  const step = (n: number) => (view === "dia" ? goTo(toDateStr(addDays(new Date(`${selected}T12:00:00`), n))) : shiftWeek(n));
+  const rangeLabel = view === "dia" ? dayLabel(selected) : `${days[0]!.split("-").reverse().slice(0, 2).join("/")} a ${days[6]!.split("-").reverse().slice(0, 2).join("/")}`;
 
   return (
     <div className="space-y-4">
@@ -639,21 +651,24 @@ export default function Agenda() {
       </aside>
       <div className="min-w-0 flex-1 space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="outline" size="icon" aria-label="Semana anterior" onClick={() => shiftWeek(-1)}>
+        <Button variant="outline" size="icon" aria-label={view === "dia" ? "Dia anterior" : "Semana anterior"} onClick={() => step(-1)}>
           <ChevronLeft className="w-4 h-4" />
         </Button>
         <Button variant="outline" onClick={() => goTo(toDateStr(new Date()))}>
           Hoje
         </Button>
-        <Button variant="outline" size="icon" aria-label="Próxima semana" onClick={() => shiftWeek(1)}>
+        <Button variant="outline" size="icon" aria-label={view === "dia" ? "Próximo dia" : "Próxima semana"} onClick={() => step(1)}>
           <ChevronRight className="w-4 h-4" />
         </Button>
         <span className="text-sm font-medium" aria-live="polite">
           {rangeLabel}
         </span>
         <div className="flex gap-1 ml-auto" role="group" aria-label="Modo de visualização">
+          <Button size="sm" variant={view === "dia" ? "default" : "outline"} aria-pressed={view === "dia"} onClick={() => changeView("dia")}>
+            <CalendarDays className="w-4 h-4 mr-1" /> Dia
+          </Button>
           <Button size="sm" variant={view === "grade" ? "default" : "outline"} aria-pressed={view === "grade"} onClick={() => changeView("grade")}>
-            <CalendarDays className="w-4 h-4 mr-1" /> Grade
+            <CalendarRange className="w-4 h-4 mr-1" /> Semana
           </Button>
           <Button size="sm" variant={view === "lista" ? "default" : "outline"} aria-pressed={view === "lista"} onClick={() => changeView("lista")}>
             <List className="w-4 h-4 mr-1" /> Lista
@@ -681,7 +696,7 @@ export default function Agenda() {
                 <span>
                   {new Date(p.starts_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} {hhmm(p.starts_at)} · {patientName.get(p.patient_id) ?? "Paciente"}
                 </span>
-                <Button size="sm" variant="outline" onClick={() => navigate(`/pacientes/${p.patient_id}?sessao=${p.id}`)}>
+                <Button size="sm" variant="outline" onClick={() => navigate(`/pacientes/${p.patient_id}/atendimento/${p.id}`)}>
                   Preencher
                 </Button>
               </li>
@@ -692,7 +707,19 @@ export default function Agenda() {
       )}
       {appts.isError && <p className="text-sm text-destructive">{errMsg(appts.error, "Não foi possível carregar a agenda.")}</p>}
 
-      {view === "grade" ? (
+      {view === "dia" ? (
+        <WeekGrid
+          selected={selected}
+          days={[selected]}
+          appts={appts.data ?? []}
+          blocks={blocks.data ?? []}
+          patientName={patientName}
+          showFree={isPsi || !!pro}
+          onSelect={(a) => setDetail(a.id)}
+          onPickSlot={pickSlot}
+          detail={(a) => [patientById.get(a.patient_id)?.telefone, !isPsi ? proName.get(a.professional_id) : null].filter(Boolean).join(" · ")}
+        />
+      ) : view === "grade" ? (
         <>
           {!isPsi && !pro && <p className="text-xs text-muted-foreground">Escolha um psicólogo no filtro para ver os horários livres de cada dia (8h às 18h). Clique em um horário vazio para marcar uma sessão.</p>}
           <WeekGrid selected={selected} days={days} appts={appts.data ?? []} blocks={blocks.data ?? []} patientName={patientName} showFree={isPsi || !!pro} onSelect={(a) => setDetail(a.id)} onPickSlot={pickSlot} />
