@@ -753,6 +753,9 @@ export default function Agenda() {
     );
   };
 
+  // "Nova sessão" e "Bloquear horário" começam na semana que está na tela (hoje, se a semana atual estiver aberta)
+  const todayStr = toDateStr(new Date());
+  const baseDate = todayStr >= toDateStr(anchor) && todayStr < toDateStr(addDays(anchor, 7)) ? todayStr : toDateStr(anchor);
   const detailAppt = (appts.data ?? []).find((a) => a.id === detail) ?? null;
 
   const rangeLabel = `${days[0]!.split("-").reverse().slice(0, 2).join("/")} a ${days[6]!.split("-").reverse().slice(0, 2).join("/")}`;
@@ -896,7 +899,7 @@ export default function Agenda() {
       )}
 
       <ChangeHistory table="appointments" rowId={history} open={!!history} onClose={() => setHistory(null)} title="Histórico da sessão" />
-      <BlockDialog open={blocking} onClose={() => setBlocking(false)} pros={pros.data ?? []} defaultDate={toDateStr(new Date())} />
+      <BlockDialog open={blocking} onClose={() => setBlocking(false)} pros={pros.data ?? []} defaultDate={baseDate} />
       <SessionDialog
         appointment={null}
         open={creating}
@@ -906,7 +909,7 @@ export default function Agenda() {
         }}
         patients={patients.data ?? []}
         pros={pros.data ?? []}
-        defaultDate={slot?.date ?? toDateStr(new Date())}
+        defaultDate={slot?.date ?? baseDate}
         defaultTime={slot?.time}
         defaultProfessional={pro}
       />

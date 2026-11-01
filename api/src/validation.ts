@@ -82,3 +82,19 @@ export const cnpjSchema = z
   .max(30)
   .transform(onlyDocChars)
   .refine(isValidCnpj, "CNPJ inválido");
+
+/** Chave Pix: CPF/CNPJ (só dígitos; CNPJ pode ser alfanumérico), telefone (+55DDDNÚMERO), e-mail ou chave aleatória (UUID). */
+export const pixKeySchema = z
+  .string()
+  .trim()
+  .max(77)
+  .refine(
+    (v) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) ||
+      /^\+55\d{10,11}$/.test(v) ||
+      /^\d{11}$/.test(v) ||
+      /^[0-9A-Za-z]{12}\d{2}$/.test(v) ||
+      emailSchema.safeParse(v).success,
+    "Chave Pix inválida: use CPF, CNPJ, e-mail, telefone no formato +5511999998888 ou a chave aleatória",
+  )
+  .transform((v) => (v.includes("@") || /^[0-9a-f]{8}-/i.test(v) ? v.toLowerCase() : v));

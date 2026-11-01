@@ -40,6 +40,7 @@ export interface AppUser {
   role: Role;
   crp: string | null;
   cpf: string | null;
+  pix_chave: string | null;
   atende: boolean;
   telefone: string | null;
   status: "convidado" | "ativo" | "inativo";
@@ -56,6 +57,7 @@ export interface Professional {
   id: string;
   nome: string;
   crp: string | null;
+  pix_chave: string | null;
 }
 
 export interface Anamnesis {

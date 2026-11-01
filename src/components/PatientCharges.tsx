@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Copy, Plus, QrCode } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { api, errMsg } from "@/lib/api";
 import { todayIn } from "@/lib/dates";
 import { brl, centsToInput, dateBR, monthLabel, newIdempotencyKey, parseBRL } from "@/lib/money";
-import type { Charge, ChargeDetail, ChargeStatus, Payer, PatientDetail, PaymentMethod } from "@/lib/types";
+import type { Charge, ChargeDetail, ChargeStatus, Payer, PatientDetail, PaymentMethod, Professional } from "@/lib/types";
+import { pixCopiaECola } from "@shared/pix";
 import { NativeSelect } from "@/components/NativeSelect";
 import { ProfessionalSelect } from "@/pages/Patients";
 import { ChargeInvoice } from "@/components/ChargeInvoice";
@@ -324,6 +325,50 @@ function FlagToggles({ charge }: { charge: ChargeDetail }) {
 
 type Action = { kind: "reverse"; paymentId: string } | { kind: "cancel" } | null;
 
+/** Pix "copia e cola" do saldo da cobrança, com a chave Pix do psicólogo. O código é gerado aqui, no navegador. */
+function PixBox({ charge }: { charge: ChargeDetail }) {
+  const { user } = useAuth();
+  const pros = useQuery({ queryKey: ["professionals"], queryFn: () => api<Professional[]>("/professionals") });
+  const [open, setOpen] = useState(false);
+  if (charge.status === "cancelada" || charge.saldo_centavos <= 0) return null;
+  const chave = pros.data?.find((p) => p.id === charge.professional_id)?.pix_chave;
+  if (!chave) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        {user?.role === "admin" ? "Para gerar o Pix copia e cola, cadastre a chave Pix do psicólogo em Usuários > Editar." : "Sem chave Pix cadastrada para este psicólogo. Peça à administração para cadastrar."}
+      </p>
+    );
+  }
+  const code = pixCopiaECola({ chave, valorCentavos: charge.saldo_centavos, nome: charge.profissional_nome ?? "Recebedor" });
+  const copiar = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      toast.success("Pix copia e cola copiado");
+    } catch {
+      toast.error("Não foi possível copiar. Selecione o código e copie manualmente.");
+    }
+  };
+  return (
+    <div className="space-y-2 rounded-xl border p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-medium">Pix de {brl(charge.saldo_centavos)}</p>
+        <Button size="sm" variant="outline" onClick={() => setOpen((o) => !o)}>
+          <QrCode className="w-4 h-4 mr-2" /> {open ? "Ocultar Pix" : "Pix copia e cola"}
+        </Button>
+      </div>
+      {open && (
+        <>
+          <textarea readOnly rows={4} aria-label="Código Pix copia e cola" className="w-full rounded-md border bg-muted/40 p-2 font-mono text-xs" value={code} onFocus={(e) => e.currentTarget.select()} />
+          <Button size="sm" onClick={() => void copiar()}>
+            <Copy className="w-4 h-4 mr-2" /> Copiar código
+          </Button>
+          <p className="text-xs text-muted-foreground">Envie o código ao paciente. No app do banco: Pix &gt; Pix copia e cola. Depois do pagamento, registre-o em "Receber".</p>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function DetailDialog({ chargeId, onClose }: { chargeId: string | null; onClose: () => void }) {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -389,6 +434,7 @@ export function DetailDialog({ chargeId, onClose }: { chargeId: string | null; o
               ))}
               {c.pagamentos.length === 0 && <li className="p-4 text-center text-sm text-muted-foreground">Nenhum pagamento registrado.</li>}
             </ul>
+            <PixBox charge={c} />
             {c.status !== "cancelada" && <FlagToggles charge={c} />}
             <ChargeInvoice charge={c} />
             {action && (
