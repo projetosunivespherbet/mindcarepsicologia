@@ -83,11 +83,9 @@ export function SessionCard({
     setObs(null);
   }, [a?.id]);
   const salvarObs = useMutation({
-    mutationFn: () => api(`/patients/${a!.patient_id}`, { method: "PATCH", body: { observacoes: obs?.trim() || null } }),
+    mutationFn: () => api(`/appointments/${a!.id}`, { method: "PATCH", body: { observacao: obs?.trim() || null } }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["patients-all"] });
-      void qc.invalidateQueries({ queryKey: ["patients"] });
-      void qc.invalidateQueries({ queryKey: ["patient", a!.patient_id] });
+      void qc.invalidateQueries({ queryKey: ["appointments"] });
       toast.success("Observação salva");
       setObs(null);
     },
@@ -155,6 +153,7 @@ export function SessionCard({
                 <Info rotulo="E-mail" valor={patient?.email} />
                 <Info rotulo="CPF" valor={patient?.cpf ? formatCpf(patient.cpf) : null} />
                 <Info rotulo="CNS" valor={patient?.cns ? formatCns(patient.cns) : null} />
+                {patient?.observacoes && <Info rotulo="Observações" valor={patient.observacoes} />}
                 {patient?.responsavel_nome && (
                   <Info
                     rotulo="Responsável legal"
@@ -173,20 +172,20 @@ export function SessionCard({
               {proName && <p>Psicólogo: {proName}</p>}
             </section>
 
-            <section aria-label="Observações sobre o paciente" className="text-sm">
+            <section aria-label="Observação do agendamento" className="text-sm">
               <div className="mb-1 flex items-center justify-between gap-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Observações sobre o paciente</h3>
-                {obs === null && (
-                  <Button size="sm" variant="ghost" className="h-7" onClick={() => setObs(patient?.observacoes ?? "")}>
-                    {patient?.observacoes ? "Editar" : "Adicionar"}
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Observação</h3>
+                {obs === null && a.status !== "cancelado" && (
+                  <Button size="sm" variant="ghost" className="h-7" onClick={() => setObs(a.observacao ?? "")}>
+                    {a.observacao ? "Editar" : "Adicionar"}
                   </Button>
                 )}
               </div>
               {obs === null ? (
-                <p className={patient?.observacoes ? "whitespace-pre-wrap" : "text-muted-foreground"}>{patient?.observacoes || "Nenhuma observação."}</p>
+                <p className={a.observacao ? "whitespace-pre-wrap" : "text-muted-foreground"}>{a.observacao || "Nenhuma observação nesta sessão."}</p>
               ) : (
                 <div className="space-y-2">
-                  <Textarea aria-label="Observações sobre o paciente" rows={3} maxLength={1000} value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Ex.: prefere contato por WhatsApp; vem com a mãe. Conteúdo clínico vai no prontuário." />
+                  <Textarea aria-label="Observação do agendamento" rows={3} maxLength={500} value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Ex.: vem acompanhado; pediu recibo; chegar 10 min antes. Conteúdo clínico vai no prontuário." />
                   <div className="flex gap-2">
                     <Button size="sm" disabled={salvarObs.isPending} onClick={() => salvarObs.mutate()}>
                       Salvar observação
