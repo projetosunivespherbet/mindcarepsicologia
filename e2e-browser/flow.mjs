@@ -315,8 +315,12 @@ await step("psicólogo agenda a sessão de hoje e marca como realizada (a cobran
   await fill(psi, "#s-valor", "175");
   await click(psi, aria("Agendar", "button"));
   await see(psi, "Agendado");
-  await click(psi, aria("Realizada", "button"));
-  await see(psi, "A receber");
+  await click(psi, aria("Abrir", "button"));
+  await click(psi, aria("Iniciar atendimento", "button"));
+  await fill(psi, "#pr-conteudo", "Evolução da sessão.");
+  await click(psi, aria("Salvar e concluir atendimento", "button"));
+  await see(psi, "cobrança criada");
+
 });
 
 await step("no paciente, a cobrança da sessão é recebida e fica paga", async () => {
@@ -381,7 +385,10 @@ await step("psicólogo registra uma sessão pro bono (sem valor, sem cobrança) 
   await psi.select("#s-atend", "pro_bono");
   await click(psi, aria("Agendar", "button"));
   await see(psi, "Pro bono");
-  await click(psi, aria("Realizada", "button"));
+  await click(psi, aria("Abrir", "button"));
+  await click(psi, aria("Iniciar atendimento", "button"));
+  await fill(psi, "#pr-conteudo", "Sessão pro bono.");
+  await click(psi, aria("Salvar e concluir atendimento", "button"));
   await see(psi, "Sessão pro bono registrada");
   await click(psi, aria("Nova sessão", "button"));
   await psi.waitForSelector("#s-pac option:nth-child(2)", { timeout: T });
@@ -389,8 +396,12 @@ await step("psicólogo registra uma sessão pro bono (sem valor, sem cobrança) 
   await setInput(psi, "#s-hora", "02:00");
   await fill(psi, "#s-valor", "150");
   await click(psi, aria("Agendar", "button"));
-  await click(psi, aria("Realizada", "button"));
-  await see(psi, "Sem nota");
+  await psi.goto(`${BASE}/agenda`);
+  await click(psi, aria("Abrir", "button"));
+  await click(psi, aria("Iniciar atendimento", "button"));
+  await fill(psi, "#pr-conteudo", "Sessão particular.");
+  await click(psi, aria("Salvar e concluir atendimento", "button"));
+  await see(psi, "cobrança criada");
 });
 
 await step("administração vê as pendências de emissão e o histórico de uma sessão", async () => {
@@ -398,6 +409,7 @@ await step("administração vê as pendências de emissão e o histórico de uma
   await click(admin, aria("Fiscal", "tab"));
   await see(admin, "Pendências de emissão");
   await admin.goto(`${BASE}/agenda`);
+  await click(admin, aria("Abrir", "button"));
   await click(admin, aria("Histórico", "button"));
   await see(admin, "Histórico da sessão");
   await see(admin, "criou");
